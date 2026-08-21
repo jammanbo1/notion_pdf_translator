@@ -127,7 +127,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
     content_payload = []
     prompt = """
 당신은 최고의 시험 대비 튜터이자 전공 학업 요약 전문가입니다.
-첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론과 실전 계산이 완벽히 연결되는 고품질 요약 리포트를 HTML 코드로 작성해주세요.
+첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론, 실전 계산, 시각적 다이어그램이 조화된 고품질 요약 리포트를 HTML 코드로 작성해주세요.
 
 [작성 규칙]
 1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
@@ -135,7 +135,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
 3. 수식은 반드시 LaTeX 문법($$...$$ 또는 $...$)으로 작성:
    <div class="formula-box">수식 설명 및 $$ E = mc^2 $$</div>
 4. 핵심 포인트: <div class="callout-box"><strong> Key Point:</strong> ... </div>
-5. 개념 간 대칭/비교 구조가 있는 경우 대칭 다이어그램 박스 활용:
+5. 개념 간 대칭/비교 구조:
    <div class="concept-map">
      <div class="map-col">
        <div class="map-header">좌측 개념명</div>
@@ -150,30 +150,38 @@ def extract_and_design_multiple_files(file_list: list) -> str:
      </div>
    </div>
 
-6. 실전 적용 예제 문항 및 계산 전개 (필수 추가):
-   학습한 공식/개념이 실제 시험 문제에 어떻게 적용되는지 보여주기 위해, 원문에 예제가 있다면 계산 과정을 자세히 복원하고, 원문에 예제가 없더라도 가장 대표적인 빈출 예제 1~2개를 생성하여 다음 형식으로 작성하세요:
+6. 실전 적용 예제 문항 및 계산 전개:
+   원문의 예제를 살리거나, 핵심 공식마다 빈출 예제 1~2개를 다음 형식으로 작성:
    <div class="example-box">
      <div class="example-header">📝 실전 적용 예제 (Example Problem)</div>
-     <div class="example-question"><strong>[문제]</strong> 문제 상황 및 주어진 조건 제시</div>
+     <div class="example-question"><strong>[문제]</strong> 문제 상황 및 조건</div>
      <div class="example-solution">
        <div class="solution-title"> 정석 풀이 및 계산 과정:</div>
-       <p>1단계: 조건 분석 및 적용 공식 선정</p>
+       <p>1단계: 조건 분석 및 공식 선정</p>
        <div class="calc-step">$$ \\text{수식 전개} $$</div>
-       <p>2단계: 수치 대입 및 최종 결과 도출</p>
+       <p>2단계: 결과 도출</p>
        <div class="calc-step">$$ \\therefore \\text{결과값} $$</div>
      </div>
    </div>
 
 7. 시험용 숏컷 / 극한 단축 풀이 (#보이스피싱):
-   위 예제나 개념에서 정석 계산을 대폭 줄일 수 있는 방법(대칭성 이용, 차원 분석, 극한 조건 대입, 공식 치환 꼼수 등)이 있다면 아래 전용 박스를 반드시 추가하세요:
    <div class="voice-phishing-box">
      <div class="phishing-header">⚡ #보이스피싱 (실전 초단축 풀이법)</div>
-     <p><strong>핵심 아이디어:</strong> 정석 계산을 생략하고 답을 바로 도출하는 직관적 원리</p>
-     <div class="phishing-formula">$$ 단축 수식/조건식 $$</div>
-     <p class="phishing-desc">실제 시험 문제에 적용하는 구체적인 팁 서술</p>
+     <p><strong>핵심 아이디어:</strong> 직관적 도출 원리</p>
+     <div class="phishing-formula">$$ 단축 수식 $$</div>
+     <p class="phishing-desc">실전 적용 팁 서술</p>
    </div>
 
-8. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+8. 시각화 다이어그램 / 물리 도식 (절대 깨지지 않는 인라인 SVG):
+   좌표계, 도체/유전체 단면, 회로도, 전하/전류 배치 등 그림 설명이 필요한 경우 외부 이미지 링크를 쓰지 말고 순수 <svg> 코드로 직접 그려서 삽입하세요:
+   <div class="svg-container">
+     <svg viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
+       <!-- 선, 도형, 화살표, 텍스트 라벨 등을 깔끔하게 구성 -->
+     </svg>
+     <div class="caption">도식 설명</div>
+   </div>
+
+9. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
     content_payload.append(prompt)
 
@@ -236,7 +244,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .map-arrow {{ display: flex; align-items: center; justify-content: center; font-size: 20px; color: #4A5568; padding: 0 4px; }}
   .map-desc {{ font-size: 11px; color: #4A5568; margin: 4px 0 0 0; line-height: 1.5; }}
 
-  /* 실전 적용 예제 박스 스타일 */
+  /* 실전 적용 예제 박스 */
   .example-box {{ background-color: #F7FAFC; border: 1px solid #CBD5E0; border-left: 5px solid #319795; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 18px 0; }}
   .example-header {{ font-weight: 800; font-size: 13px; color: #285E61; margin-bottom: 8px; }}
   .example-question {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 4px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; }}
@@ -249,6 +257,11 @@ def build_full_html(title: str, content_html: str) -> str:
   .phishing-header {{ font-weight: 800; font-size: 13px; color: #6B46C1; margin-bottom: 6px; }}
   .phishing-formula {{ background-color: #FFFFFF; border: 1px dashed #B794F4; border-radius: 4px; padding: 8px; margin: 8px 0; text-align: center; }}
   .phishing-desc {{ font-size: 12px; color: #4A5568; margin: 0; line-height: 1.6; }}
+
+  /* 인라인 SVG 다이어그램 컨테이너 */
+  .svg-container {{ text-align: center; margin: 18px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }}
+  .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
+  .caption {{ font-size: 11px; color: #718096; margin-top: 6px; text-align: center; }}
 </style>
 </head>
 <body>
