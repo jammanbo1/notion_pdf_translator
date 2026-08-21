@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import mimetypes
 import tempfile
 import requests
 from dotenv import load_dotenv
@@ -18,24 +19,19 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
-
-# 일일 1,000회 / 분당 15회로 무료 쿼터가 가장 넉넉한 표준 모델
-model = genai.GenerativeModel("gemini-3.5-flash-lite")
+model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 
 def get_or_create_release(tag="pdf-reports"):
-    """GitHub Release 생성 또는 기존 릴리즈 정보 가져오기"""
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
     }
     url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/tags/{tag}"
     res = requests.get(url, headers=headers)
-
     if res.status_code == 200:
         return res.json()
 
-    # 릴리즈가 없으면 신규 생성
     create_url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases"
     payload = {
         "tag_name": tag,
@@ -50,7 +46,6 @@ def get_or_create_release(tag="pdf-reports"):
 
 
 def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
-    """PDF를 GitHub Release Asset으로 업로드하고 다운로드 직링크 반환"""
     release = get_or_create_release()
     upload_url_template = release["upload_url"]
     upload_url = upload_url_template.replace("{?name,label}", "")
@@ -60,7 +55,6 @@ def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
         "Content-Type": "application/pdf",
     }
 
-    # 파일명 충돌 방지 및 안전한 이름 생성
     safe_name = f"{int(time.time())}_{os.path.basename(file_path)}"
     params = {"name": safe_name}
 
@@ -107,36 +101,43 @@ def get_unprocessed_items():
         elif status_type == "select" and status_prop.get("select"):
             current_status = status_prop["select"].get("name", "")
 
-        # '처리완료' 또는 '완료'가 아닌 미처리 항목만 선별
         if current_status not in ["처리완료", "완료"]:
             unprocessed.append(page)
 
     return unprocessed
 
 
-def find_pdf_attachments(page):
-    pdf_files = []
+def find_supported_attachments(page):
+    """PDF뿐만 아니라 이미지 파일(PNG, JPG, JPEG)도 함께 추출"""
+    supported_files = []
     properties = page.get("properties", {})
+    allowed_exts = (".pdf", ".png", ".jpg", ".jpeg")
 
     for prop_value in properties.values():
         if prop_value.get("type") == "files":
             for file_obj in prop_value.get("files", []):
                 file_name = file_obj.get("name", "")
-                if file_name.lower().endswith(".pdf"):
+                if file_name.lower().endswith(allowed_exts):
                     url = file_obj.get("file", {}).get("url") or file_obj.get("external", {}).get("url")
-                    pdf_files.append({"name": file_name, "url": url})
+                    supported_files.append({"name": file_name, "url": url})
 
-    return pdf_files
+    return supported_files
 
 
-def extract_and_design_with_gemini(pdf_url: str) -> str:
-    res = requests.get(pdf_url, stream=True, timeout=120)
+def extract_and_design_with_gemini(file_url: str, file_name: str) -> str:
+    """PDF 및 손글씨 이미지 파일을 분석하여 깔끔한 HTML 리포트 생성"""
+    res = requests.get(file_url, stream=True, timeout=120)
     res.raise_for_status()
-    pdf_bytes = res.content
+    file_bytes = res.content
+
+    mime_type, _ = mimetypes.guess_type(file_name)
+    if not mime_type:
+        mime_type = "application/pdf" if file_name.lower().endswith(".pdf") else "image/jpeg"
 
     prompt = """
-당신은 최고의 문서 디자이너이자 요약 정리 전문가입니다.
-주어진 PDF 문서 내용을 분석하여 가독성이 뛰어난 요약 리포트를 HTML 본문 코드로 작성해주세요.
+당신은 최고의 문서 디자이너이자 전공 학업 정리 전문가입니다.
+주어진 파일(문서 또는 손글씨 노트 사진)을 꼼꼼히 분석하여 가독성이 뛰어난 요약 리포트를 HTML 코드로 작성해주세요.
+만약 손글씨 필기 노트 사진인 경우, 필기된 글씨와 수식 기호를 정확히 판독하여 체계적으로 정리해주세요.
 
 [작성 규칙]
 1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: ... </div>
@@ -148,11 +149,10 @@ def extract_and_design_with_gemini(pdf_url: str) -> str:
    <div class="image-container"><img src="https://source.unsplash.com/800x400/?{주제영문키워드}" alt="참고이미지" onerror="this.style.display='none'"/><div class="caption">관련 참고 자료</div></div>
 6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
-    # 429 요청 한도 감지 시 지수 백오프 자동 재시도
     for attempt in range(3):
         try:
             response = model.generate_content(
-                [prompt, {"mime_type": "application/pdf", "data": pdf_bytes}],
+                [prompt, {"mime_type": mime_type, "data": file_bytes}],
                 request_options={"timeout": 300}
             )
             return response.text
@@ -226,10 +226,7 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
 
 
 def update_notion_success(page_id: str, download_url: str):
-    """Notion의 '정리본 링크'에 URL 등록 및 상태를 '완료'로 변경"""
-    update_data = {
-        "정리본 링크": {"url": download_url}
-    }
+    update_data = {"정리본 링크": {"url": download_url}}
     try:
         update_data["상태"] = {"status": {"name": "완료"}}
         notion.pages.update(page_id=page_id, properties=update_data)
@@ -244,7 +241,7 @@ def update_notion_success(page_id: str, download_url: str):
 def main():
     items = get_unprocessed_items()
     if not items:
-        print("처리할 새 PDF가 없습니다.")
+        print("처리할 새 파일이 없습니다.")
         return
 
     print(f"새 미처리 항목 {len(items)}개 발견.")
@@ -252,30 +249,26 @@ def main():
     with tempfile.TemporaryDirectory() as temp_dir:
         for page in items:
             page_id = page["id"]
-            pdfs = find_pdf_attachments(page)
-            if not pdfs:
+            files = find_supported_attachments(page)
+            if not files:
                 continue
 
-            for pdf in pdfs:
-                file_name = pdf["name"]
+            for file_item in files:
+                file_name = file_item["name"]
                 base_name = os.path.splitext(file_name)[0]
                 print(f"'{file_name}' 분석 및 디자인 PDF 생성 중...")
 
                 try:
-                    # 1. Gemini 요약 및 본문 HTML 획득
-                    body_html = extract_and_design_with_gemini(pdf["url"])
+                    body_html = extract_and_design_with_gemini(file_item["url"], file_name)
                     full_html = build_full_html(base_name, body_html)
 
-                    # 2. 임시 PDF 파일 렌더링
                     temp_pdf_path = os.path.join(temp_dir, f"{base_name}_정리본.pdf")
                     render_html_to_pdf(full_html, temp_pdf_path)
 
-                    # 3. GitHub Releases에 PDF 업로드 및 다운로드 링크 획득
                     print("  -> GitHub Storage에 업로드 중...")
                     pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{base_name}_정리본.pdf")
                     print(f"  -> 다운로드 링크 생성 완료: {pdf_url}")
 
-                    # 4. Notion 표 업데이트
                     update_notion_success(page_id, pdf_url)
                     print("  -> Notion 업데이트 완료!\n")
 
