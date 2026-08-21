@@ -1,19 +1,65 @@
 import os
 import re
+import json
+import tempfile
 import requests
 from dotenv import load_dotenv
 from notion_client import Client
 import google.generativeai as genai
+from playwright.sync_api import sync_playwright
+
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 load_dotenv()
 
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 NOTION_DB_ID = os.environ["NOTION_DB_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID")
+GDRIVE_JSON_STR = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-3.6-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+
+def get_drive_service():
+    """Google Drive API 서비스 클라이언트 생성"""
+    service_account_info = json.loads(GDRIVE_JSON_STR)
+    creds = service_account.Credentials.from_service_account_info(
+        service_account_info,
+        scopes=["https://www.googleapis.com/auth/drive.file"]
+    )
+    return build("drive", "v3", credentials=creds)
+
+
+def upload_pdf_to_drive(file_path: str, file_name: str) -> str:
+    """PDF를 구글 드라이브에 업로드하고 열람 링크(URL)를 반환"""
+    drive_service = get_drive_service()
+    
+    file_metadata = {
+        "name": file_name,
+        "parents": [GDRIVE_FOLDER_ID] if GDRIVE_FOLDER_ID else []
+    }
+    media = MediaFileUpload(file_path, mimetype="application/pdf", resumable=True)
+    
+    uploaded_file = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id, webViewLink"
+    ).execute()
+    
+    file_id = uploaded_file.get("id")
+    
+    # 링크가 있는 모든 사용자가 읽을 수 있도록 공개 권한 부여
+    drive_service.permissions().create(
+        fileId=file_id,
+        body={"type": "anyone", "role": "reader"}
+    ).execute()
+    
+    return uploaded_file.get("webViewLink")
 
 
 def get_data_source_id():
@@ -73,20 +119,25 @@ def find_pdf_attachments(page):
     return pdf_files
 
 
-def extract_summary_with_gemini(pdf_url: str) -> str:
+def extract_and_design_with_gemini(pdf_url: str) -> str:
     res = requests.get(pdf_url, stream=True, timeout=120)
     res.raise_for_status()
     pdf_bytes = res.content
 
-    prompt = (
-        "이 PDF 문서의 내용을 체계적으로 요약 및 정리해줘.\n"
-        "작성 규칙:\n"
-        "1. ## 대제목, ### 중제목, - 불릿 포인트 형태로 구조화할 것.\n"
-        "2. 핵심 요약은 [핵심요약] 머리말로 시작하는 단락으로 작성할 것.\n"
-        "3. 수식은 LaTeX 문법($$...$$ 또는 $...$)을 사용할 것.\n"
-        "4. 중요 키워드는 **볼드체**로 강조할 것."
-    )
+    prompt = """
+당신은 최고의 문서 디자이너이자 요약 정리 전문가입니다.
+주어진 PDF 문서 내용을 분석하여 이해하기 쉽고 시각적으로 매우 수려한 요약 리포트를 HTML 본문 코드로 작성해주세요.
 
+[작성 규칙]
+1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: ... </div>
+2. 중요 키워드는 <span class="highlight">강조</span> 처리.
+3. 수식은 반드시 LaTeX 문법($$...$$ 또는 $...$)으로 작성:
+   <div class="formula-box">수식 설명 및 $$ E = mc^2 $$</div>
+4. 핵심 포인트: <div class="callout-box"><strong> Key Point:</strong> ... </div>
+5. 관련 Unsplash 무료 이미지 1개 배치:
+   <div class="image-container"><img src="https://source.unsplash.com/800x400/?{주제영문키워드}" alt="참고이미지" onerror="this.style.display='none'"/><div class="caption">관련 참고 자료</div></div>
+6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+"""
     response = model.generate_content(
         [prompt, {"mime_type": "application/pdf", "data": pdf_bytes}],
         request_options={"timeout": 300}
@@ -94,69 +145,80 @@ def extract_summary_with_gemini(pdf_url: str) -> str:
     return response.text
 
 
-def append_markdown_to_notion(page_id: str, markdown_text: str):
-    """마크다운을 파싱하여 노션의 제목, 본문, 콜아웃 블록으로 변환해 페이지에 추가합니다."""
-    blocks = []
-    lines = markdown_text.split("\n")
+def build_full_html(title: str, content_html: str) -> str:
+    clean_html = re.sub(r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE)
 
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
+    return f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>{title}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {{
+            delimiters: [
+                {{left: '$$', right: '$$', display: true}},
+                {{left: '$', right: '$', display: false}}
+            ],
+            throwOnError: false
+        }});"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
+  @page {{ size: A4; margin: 20mm 15mm; }}
+  body {{ font-family: 'Pretendard', sans-serif; color: #2D3748; line-height: 1.7; font-size: 13px; margin: 0; }}
+  .header-container {{ border-bottom: 2px solid #2B6CB0; padding-bottom: 12px; margin-bottom: 20px; }}
+  .doc-title {{ font-size: 22px; font-weight: 800; color: #1A365D; margin: 0 0 6px 0; }}
+  .doc-subtitle {{ font-size: 12px; color: #718096; margin: 0; }}
+  h2 {{ font-size: 16px; font-weight: 700; color: #2B6CB0; border-left: 4px solid #3182CE; padding-left: 8px; margin-top: 24px; }}
+  .highlight {{ background-color: #FEFCBF; padding: 2px 5px; border-radius: 4px; font-weight: 600; }}
+  .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
+  .formula-box {{ background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #4A5568; border-radius: 4px 8px 8px 4px; padding: 12px; margin: 12px 0; }}
+  .callout-box {{ background-color: #FFFDF5; border-left: 5px solid #D69E2E; padding: 12px 14px; margin: 12px 0; border-radius: 4px 8px 8px 4px; }}
+  .image-container {{ text-align: center; margin: 16px 0; }}
+  .image-container img {{ max-width: 90%; max-height: 220px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+  .caption {{ font-size: 11px; color: #718096; margin-top: 4px; }}
+</style>
+</head>
+<body>
+  <div class="header-container">
+    <h1 class="doc-title">{title}</h1>
+    <p class="doc-subtitle">핵심 요약 및 개념 정리 리포트</p>
+  </div>
+  {clean_html}
+</body>
+</html>
+"""
 
-        if stripped.startswith("### "):
-            blocks.append({
-                "object": "block",
-                "type": "heading_3",
-                "heading_3": {"rich_text": [{"type": "text", "text": {"content": stripped[4:]}}]}
-            })
-        elif stripped.startswith("## "):
-            blocks.append({
-                "object": "block",
-                "type": "heading_2",
-                "heading_2": {"rich_text": [{"type": "text", "text": {"content": stripped[3:]}}]}
-            })
-        elif stripped.startswith("[핵심요약]"):
-            blocks.append({
-                "object": "block",
-                "type": "callout",
-                "callout": {
-                    "rich_text": [{"type": "text", "text": {"content": stripped}}],
-                    "icon": {"emoji": "💡"}
-                }
-            })
-        elif stripped.startswith("- ") or stripped.startswith("* "):
-            blocks.append({
-                "object": "block",
-                "type": "bulleted_list_item",
-                "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": stripped[2:]}}]}
-            })
-        else:
-            blocks.append({
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {"rich_text": [{"type": "text", "text": {"content": stripped[:1800]}}]}
-            })
 
-    # 노션 API는 1회 요청 시 최대 100개 블록 제한이 있으므로 50개씩 분할 전송
-    for i in range(0, len(blocks), 50):
-        notion.blocks.children.append(
-            block_id=page_id,
-            children=blocks[i:i + 50]
+def render_html_to_pdf(html_content: str, output_pdf_path: str):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(html_content, wait_until="networkidle")
+        page.wait_for_timeout(2500)
+        page.pdf(
+            path=output_pdf_path,
+            format="A4",
+            print_background=True,
+            margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"}
         )
+        browser.close()
 
 
-def mark_page_as_done(page_id: str):
+def update_notion_success(page_id: str, drive_url: str):
+    """Notion의 '정리본 링크' 속성에 드라이브 URL을 넣고 '상태'를 '처리완료'로 변경"""
+    update_data = {
+        "정리본 링크": {"url": drive_url}
+    }
+    
+    # Select 또는 Status 형식 대응
     try:
-        notion.pages.update(
-            page_id=page_id,
-            properties={"상태": {"select": {"name": "처리완료"}}}
-        )
+        update_data["상태"] = {"select": {"name": "처리완료"}}
+        notion.pages.update(page_id=page_id, properties=update_data)
     except Exception:
-        notion.pages.update(
-            page_id=page_id,
-            properties={"상태": {"status": {"name": "처리완료"}}}
-        )
+        update_data["상태"] = {"status": {"name": "처리완료"}}
+        notion.pages.update(page_id=page_id, properties=update_data)
 
 
 def main():
@@ -166,21 +228,39 @@ def main():
         return
 
     print(f"새 미처리 항목 {len(items)}개 발견.")
-    for page in items:
-        page_id = page["id"]
-        pdfs = find_pdf_attachments(page)
-        if not pdfs:
-            continue
 
-        for pdf in pdfs:
-            print(f"'{pdf['name']}' 요약 및 Notion 본문 기록 중...")
-            try:
-                summary = extract_summary_with_gemini(pdf["url"])
-                append_markdown_to_notion(page_id, summary)
-                mark_page_as_done(page_id)
-                print("  -> Notion 페이지 저장 및 상태 업데이트 완료!")
-            except Exception as e:
-                print(f"  -> 실패: {e}")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for page in items:
+            page_id = page["id"]
+            pdfs = find_pdf_attachments(page)
+            if not pdfs:
+                continue
+
+            for pdf in pdfs:
+                file_name = pdf["name"]
+                base_name = os.path.splitext(file_name)[0]
+                print(f"'{file_name}' 분석 및 디자인 PDF 생성 중...")
+
+                try:
+                    # 1. Gemini로 디자인 본문 HTML 생성
+                    body_html = extract_and_design_with_gemini(pdf["url"])
+                    full_html = build_full_html(base_name, body_html)
+
+                    # 2. 임시 PDF 파일 렌더링
+                    temp_pdf_path = os.path.join(temp_dir, f"{base_name}_정리본.pdf")
+                    render_html_to_pdf(full_html, temp_pdf_path)
+
+                    # 3. Google Drive 업로드
+                    print("  -> Google Drive 업로드 중...")
+                    drive_link = upload_pdf_to_drive(temp_pdf_path, f"{base_name}_정리본.pdf")
+                    print(f"  -> Drive 링크 생성 완료: {drive_link}")
+
+                    # 4. Notion 속성 업데이트
+                    update_notion_success(page_id, drive_link)
+                    print("  -> Notion '정리본 링크' 및 상태 업데이트 완료!\n")
+
+                except Exception as e:
+                    print(f"  -> 실패: {e}\n")
 
 
 if __name__ == "__main__":
