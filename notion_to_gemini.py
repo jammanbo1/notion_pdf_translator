@@ -19,7 +19,7 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-3.5-flash-lite")
+model = genai.GenerativeModel("gemini-3.5-flash")
 
 
 def get_or_create_release(tag="pdf-reports"):
@@ -108,7 +108,6 @@ def get_unprocessed_items():
 
 
 def find_supported_attachments(page):
-    """PDF뿐만 아니라 이미지 파일(PNG, JPG, JPEG)도 함께 추출"""
     supported_files = []
     properties = page.get("properties", {})
     allowed_exts = (".pdf", ".png", ".jpg", ".jpeg")
@@ -124,23 +123,15 @@ def find_supported_attachments(page):
     return supported_files
 
 
-def extract_and_design_with_gemini(file_url: str, file_name: str) -> str:
-    """PDF 및 손글씨 이미지 파일을 분석하여 깔끔한 HTML 리포트 생성"""
-    res = requests.get(file_url, stream=True, timeout=120)
-    res.raise_for_status()
-    file_bytes = res.content
-
-    mime_type, _ = mimetypes.guess_type(file_name)
-    if not mime_type:
-        mime_type = "application/pdf" if file_name.lower().endswith(".pdf") else "image/jpeg"
-
+def extract_and_design_multiple_files(file_list: list) -> str:
+    content_payload = []
     prompt = """
 당신은 최고의 문서 디자이너이자 전공 학업 정리 전문가입니다.
-주어진 파일(문서 또는 손글씨 노트 사진)을 꼼꼼히 분석하여 가독성이 뛰어난 요약 리포트를 HTML 코드로 작성해주세요.
-만약 손글씨 필기 노트 사진인 경우, 필기된 글씨와 수식 기호를 정확히 판독하여 체계적으로 정리해주세요.
+첨부된 모든 문서/필기 이미지 자료들을 순서대로 종합하여 하나의 통일되고 완성도 높은 요약 리포트를 HTML 코드로 작성해주세요.
+손글씨 필기 노트 사진인 경우 글씨와 수식을 정확히 판독하여 누락 없이 정리하세요.
 
 [작성 규칙]
-1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: ... </div>
+1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료를 아우르는 핵심 요약</div>
 2. 중요 키워드는 <span class="highlight">강조</span> 처리.
 3. 수식은 반드시 LaTeX 문법($$...$$ 또는 $...$)으로 작성:
    <div class="formula-box">수식 설명 및 $$ E = mc^2 $$</div>
@@ -149,12 +140,19 @@ def extract_and_design_with_gemini(file_url: str, file_name: str) -> str:
    <div class="image-container"><img src="https://source.unsplash.com/800x400/?{주제영문키워드}" alt="참고이미지" onerror="this.style.display='none'"/><div class="caption">관련 참고 자료</div></div>
 6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
+    content_payload.append(prompt)
+
+    for item in file_list:
+        res = requests.get(item["url"], stream=True, timeout=120)
+        res.raise_for_status()
+        mime_type, _ = mimetypes.guess_type(item["name"])
+        if not mime_type:
+            mime_type = "application/pdf" if item["name"].lower().endswith(".pdf") else "image/jpeg"
+        content_payload.append({"mime_type": mime_type, "data": res.content})
+
     for attempt in range(3):
         try:
-            response = model.generate_content(
-                [prompt, {"mime_type": mime_type, "data": file_bytes}],
-                request_options={"timeout": 300}
-            )
+            response = model.generate_content(content_payload, request_options={"timeout": 300})
             return response.text
         except Exception as e:
             if "429" in str(e) and attempt < 2:
@@ -253,29 +251,30 @@ def main():
             if not files:
                 continue
 
-            for file_item in files:
-                file_name = file_item["name"]
-                base_name = os.path.splitext(file_name)[0]
-                print(f"'{file_name}' 분석 및 디자인 PDF 생성 중...")
+            main_title = os.path.splitext(files[0]["name"])[0]
+            if len(files) > 1:
+                main_title = f"{main_title}_외_{len(files)-1}건_통합본"
 
-                try:
-                    body_html = extract_and_design_with_gemini(file_item["url"], file_name)
-                    full_html = build_full_html(base_name, body_html)
+            print(f"'{main_title}' (총 {len(files)}개 파일) 종합 분석 및 디자인 PDF 생성 중...")
 
-                    temp_pdf_path = os.path.join(temp_dir, f"{base_name}_정리본.pdf")
-                    render_html_to_pdf(full_html, temp_pdf_path)
+            try:
+                body_html = extract_and_design_multiple_files(files)
+                full_html = build_full_html(main_title, body_html)
 
-                    print("  -> GitHub Storage에 업로드 중...")
-                    pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{base_name}_정리본.pdf")
-                    print(f"  -> 다운로드 링크 생성 완료: {pdf_url}")
+                temp_pdf_path = os.path.join(temp_dir, f"{main_title}_정리본.pdf")
+                render_html_to_pdf(full_html, temp_pdf_path)
 
-                    update_notion_success(page_id, pdf_url)
-                    print("  -> Notion 업데이트 완료!\n")
+                print("  -> GitHub Storage에 통합본 업로드 중...")
+                pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{main_title}_정리본.pdf")
+                print(f"  -> 다운로드 링크 생성 완료: {pdf_url}")
 
-                    time.sleep(5)
+                update_notion_success(page_id, pdf_url)
+                print("  -> Notion 업데이트 완료!\n")
 
-                except Exception as e:
-                    print(f"  -> 실패: {e}\n")
+                time.sleep(5)
+
+            except Exception as e:
+                print(f"  -> 실패: {e}\n")
 
 
 if __name__ == "__main__":
