@@ -129,21 +129,25 @@ def extract_and_design_multiple_files(file_list: list) -> str:
     content_payload = []
     prompt = """
 당신은 최고의 시험 대비 튜터이자 전공 학업 요약 전문가입니다.
-첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론, 선수 개념 복습, 실전 계산, 함정 방지, 요약 치트시트가 조화된 최고급 요약 리포트를 HTML 코드로 작성해주세요.
+첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론, 표준 전공서 연계 개념, 실전 계산, 함정 방지, 요약 치트시트가 조화된 최고급 요약 리포트를 HTML 코드로 작성해주세요.
 
-[엄격 수식 및 팩트체크 규칙 - Hallucination 방지]
-1. 원본 필기 오류 및 오개념 능동 검증 (Fact-Check):
-   - 원본 손글씨/문서에 물리적/수학적 오류, 계산 실수, 잘못된 공식 적용이 발견될 경우, 무비판적으로 옮겨 쓰지 말고 올바른 표준 수식 및 물리 개념으로 능동 교정하여 작성하세요.
-   - 치명적인 오개념이었던 경우 #함정주의 박스에 "⚠️ 원본 필기 교정: [잘못된 점] -> [올바른 설명]" 형태로 명시하세요.
+[엄격 수식 및 표준 전공 교재 연계 규칙]
+1. 표준 전공서(Griffiths 전자기학 등) 내장 지식 교차 참조:
+   - 본 강의 자료/필기의 핵심 주제와 직접 매핑되는 표준 전공 교재의 정석 표기법(Notation), 논리적 증명 단계, 핵심 연습문제 패턴을 능동적으로 연계하여 필기에서 누락된 물리적 맥락을 자연스럽게 보강하세요.
+   - 단, 없는 내용을 지어내지 말고 해당 단원의 학부 표준 물리학 지식을 엄밀하게 적용하세요.
 
-2. 수식 정확도 및 물리 차원(Dimension) 검증:
+2. 원본 필기 오류 및 오개념 능동 검증 (Fact-Check):
+   - 원본 손글씨/문서에 물리적/수학적 오류, 계산 실수, 잘못된 공식 적용이 발견될 경우, 그대로 옮기지 말고 올바른 표준 수식으로 교정하여 반영하세요.
+   - 중요한 오개념 교정 사항은 #함정주의 박스에 "⚠️ 원본 필기 교정: [잘못된 점] -> [올바른 설명]" 형태로 명시하세요.
+
+3. 수식 정확도 및 물리 차원(Dimension) 검증:
    - 모든 LaTeX 수식에서 물리 상수(\\epsilon_0, \\epsilon, \\mu_0, \\pi 등)와 기하 변수(a, b, r, d 등)가 뒤바뀌거나 누락되지 않도록 철저히 검증하세요. (예: 진공 전기장 분모는 4\\pi\\epsilon_0 r^2, 유전체 내부 분모는 4\\pi\\epsilon r^2)
    - 수식 기호가 텍스트와 엉키지 않도록 수식은 반드시 단독 블록($$...$$) 또는 인라인($...$)으로 명확히 닫아주세요.
 
-3. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
-4. 중요 키워드는 <span class="highlight">강조</span> 처리.
+4. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
+5. 중요 키워드는 <span class="highlight">강조</span> 처리.
 
-5. 💡 Recall (선수 개념 & 리마인드):
+6. 💡 Recall (선수 개념 & 리마인드):
    중요 개념/증명 전개 전, 필요한 선수 지식(미적분 공식, 벡터 항등식, 이전 단원 공식 등)이 있다면 아래 박스를 배치:
    <div class="recall-box">
      <div class="recall-header">💡 Recall (사전 필수 개념 & 리마인드)</div>
@@ -151,9 +155,9 @@ def extract_and_design_multiple_files(file_list: list) -> str:
      <div class="recall-formula">$$ 필수 수식/정리 $$</div>
    </div>
 
-6. 핵심 포인트: <div class="callout-box"><strong> Key Point:</strong> ... </div>
+7. 핵심 포인트: <div class="callout-box"><strong> Key Point:</strong> ... </div>
 
-7. 개념 간 대칭/비교 구조:
+8. 개념 간 대칭/비교 구조:
    <div class="concept-map">
      <div class="map-col">
        <div class="map-header">좌측 개념명</div>
@@ -168,8 +172,8 @@ def extract_and_design_multiple_files(file_list: list) -> str:
      </div>
    </div>
 
-8. 실전 적용 예제 문항 및 정석 계산 전개:
-   원문 예제를 살리거나, 핵심 공식마다 대표 예제 1~2개를 중간 유도 생략 없이 단계별로 작성:
+9. 실전 적용 예제 문항 및 정석 계산 전개:
+   원문 예제를 살리거나, 핵심 공식마다 표준 전공서의 대표 예제 1~2개를 중간 유도 생략 없이 단계별로 작성:
    <div class="example-box">
      <div class="example-header">📝 실전 적용 예제 (Example Problem)</div>
      <div class="example-question"><strong>[문제]</strong> 문제 상황 및 조건</div>
@@ -182,23 +186,23 @@ def extract_and_design_multiple_files(file_list: list) -> str:
      </div>
    </div>
 
-9. 시험용 숏컷 / 극한 단축 풀이 (#보이스피싱):
-   텍스트와 수식을 한 줄에 섞지 말고 수식 블록을 분리하여 작성:
-   <div class="voice-phishing-box">
-     <div class="phishing-header">⚡ #보이스피싱 (실전 초단축 풀이법)</div>
-     <p><strong>핵심 아이디어:</strong> 정석 유도를 건너뛰는 직관적 원리 및 가상 변위 법칙 적용</p>
-     <div class="phishing-formula">$$ F = \\frac{1}{2}V^2 \\frac{dC}{dx} $$</div>
-     <p class="phishing-desc">실전 시험 적용 팁 및 주의점</p>
-   </div>
+10. 시험용 숏컷 / 극한 단축 풀이 (#보이스피싱):
+    텍스트와 수식을 한 줄에 섞지 말고 수식 블록을 분리하여 작성:
+    <div class="voice-phishing-box">
+      <div class="phishing-header">⚡ #보이스피싱 (실전 초단축 풀이법)</div>
+      <p><strong>핵심 아이디어:</strong> 정석 유도를 건너뛰는 직관적 원리 및 가상 변위 법칙 적용</p>
+      <div class="phishing-formula">$$ F = \\frac{1}{2}V^2 \\frac{dC}{dx} $$</div>
+      <p class="phishing-desc">실전 시험 적용 팁 및 주의점</p>
+    </div>
 
-10. 시험 함정 주의 (#함정주의 / Trap Alert):
+11. 시험 함정 주의 (#함정주의 / Trap Alert):
     학생들이 부호 실수, 경계 조건 누락, 단위/상수 착각 등으로 가장 자주 감점당하는 포인트나 원본 필기의 수정 포인트를 강조:
     <div class="trap-box">
       <div class="trap-header">⚠️ #함정주의 (자주 낚이는 오개념 & 실수 포인트)</div>
       <p class="trap-desc">실수하기 쉬운 포인트 및 감점 방지 팁</p>
     </div>
 
-11. 시각화 다이어그램 / 물리 도식 (경량 인라인 SVG):
+12. 시각화 다이어그램 / 물리 도식 (경량 인라인 SVG):
     그림 설명이 꼭 필요한 경우 외부 링크 없이 20줄 이내의 단순한 <svg> 코드로 직접 삽입:
     <div class="svg-container">
       <svg viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg">
@@ -207,7 +211,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
       <div class="caption">도식 설명</div>
     </div>
 
-12. 최하단 단원 공식 치트시트 (Cheat-Sheet Table):
+13. 최하단 단원 공식 치트시트 (Cheat-Sheet Table):
     문서 맨 끝에는 시험 직전 1분 복습용으로 본문의 모든 핵심 수식과 조건을 요약한 테이블을 반드시 배치:
     <table class="cheat-sheet-table">
       <thead><tr><th>개념/법칙명</th><th>핵심 공식 (LaTeX)</th><th>적용 조건 / 주의사항</th></tr></thead>
@@ -216,7 +220,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
       </tbody>
     </table>
 
-13. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+14. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
     content_payload.append(prompt)
 
