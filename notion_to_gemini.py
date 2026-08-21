@@ -38,7 +38,7 @@ def get_or_create_release(tag="pdf-reports"):
         "name": "Generated PDF Reports",
         "body": "자동 생성된 PDF 정리본 보관소입니다.",
         "draft": False,
-        "prerelease": False
+        "prerelease": False,
     }
     create_res = requests.post(create_url, headers=headers, json=payload)
     create_res.raise_for_status()
@@ -117,7 +117,9 @@ def find_supported_attachments(page):
             for file_obj in prop_value.get("files", []):
                 file_name = file_obj.get("name", "")
                 if file_name.lower().endswith(allowed_exts):
-                    url = file_obj.get("file", {}).get("url") or file_obj.get("external", {}).get("url")
+                    url = file_obj.get("file", {}).get("url") or file_obj.get(
+                        "external", {}
+                    ).get("url")
                     supported_files.append({"name": file_name, "url": url})
 
     return supported_files
@@ -129,14 +131,16 @@ def extract_and_design_multiple_files(file_list: list) -> str:
 당신은 최고의 시험 대비 튜터이자 전공 학업 요약 전문가입니다.
 첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론, 선수 개념 복습, 실전 계산, 함정 방지, 요약 치트시트가 조화된 최고급 요약 리포트를 HTML 코드로 작성해주세요.
 
-[작성 규칙]
-1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
-2. 중요 키워드는 <span class="highlight">강조</span> 처리.
-3. 수식은 반드시 LaTeX 문법($$...$$ 또는 $...$)으로 작성:
-   <div class="formula-box">수식 설명 및 $$ E = mc^2 $$</div>
+[엄격 수식 및 텍스트 작성 규칙 - Hallucination 방지]
+1. 수식 정확도 및 물리 차원(Dimension) 검증 (필수):
+   - 모든 LaTeX 수식에서 물리 상수(\\epsilon_0, \\epsilon, \\mu_0, \\pi 등)와 기하 변수(a, b, r, d 등)가 뒤바뀌거나 누락되지 않도록 철저히 검증하세요. (예: 진공 전기장 분모는 4\\pi\\epsilon_0 r^2, 유전체 내부 분모는 4\\pi\\epsilon r^2)
+   - 수식 기호가 텍스트와 엉키지 않도록 수식은 반드시 단독 블록($$...$$) 또는 인라인($...$)으로 명확히 닫아주세요.
 
-4. 💡 Recall (선수 개념 & 까먹기 쉬운 필수 아이디어):
-   중요 개념/증명 전개 전, 필요한 선수 지식(미적분 공식, 삼각함수, 이전 단원 공식 등)이 있다면 아래 박스를 배치:
+2. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
+3. 중요 키워드는 <span class="highlight">강조</span> 처리.
+
+4. 💡 Recall (선수 개념 & 리마인드):
+   중요 개념/증명 전개 전, 필요한 선수 지식(미적분 공식, 벡터 항등식, 이전 단원 공식 등)이 있다면 아래 박스를 배치:
    <div class="recall-box">
      <div class="recall-header">💡 Recall (사전 필수 개념 & 리마인드)</div>
      <p><strong>꼭 기억해야 할 배경 지식:</strong> 설명 및 적용될 수학적/물리적 전제</p>
@@ -160,40 +164,41 @@ def extract_and_design_multiple_files(file_list: list) -> str:
      </div>
    </div>
 
-7. 실전 적용 예제 문항 및 계산 전개:
-   원문 예제를 살리거나, 핵심 공식마다 대표 예제 1~2개를 다음 형식으로 작성:
+7. 실전 적용 예제 문항 및 정석 계산 전개:
+   원문 예제를 살리거나, 핵심 공식마다 대표 예제 1~2개를 중간 유도 생략 없이 단계별로 작성:
    <div class="example-box">
      <div class="example-header">📝 실전 적용 예제 (Example Problem)</div>
      <div class="example-question"><strong>[문제]</strong> 문제 상황 및 조건</div>
      <div class="example-solution">
        <div class="solution-title"> 정석 풀이 및 계산 과정:</div>
        <p>1단계: 조건 분석 및 공식 선정</p>
-       <div class="calc-step">$$ \\text{수식 전개} $$</div>
-       <p>2단계: 결과 도출</p>
-       <div class="calc-step">$$ \\therefore \\text{결과값} $$</div>
+       <div class="calc-step">$$ \\text{정확한 수식 전개} $$</div>
+       <p>2단계: 수치/변수 대입 및 최종 결과 도출</p>
+       <div class="calc-step">$$ \\therefore \\text{정확한 결과값} $$</div>
      </div>
    </div>
 
 8. 시험용 숏컷 / 극한 단축 풀이 (#보이스피싱):
+   텍스트와 수식을 어설프게 한 줄에 쓰지 말고, 수식 블록을 명확히 분리하여 작성:
    <div class="voice-phishing-box">
      <div class="phishing-header">⚡ #보이스피싱 (실전 초단축 풀이법)</div>
-     <p><strong>핵심 아이디어:</strong> 직관적 도출 원리</p>
-     <div class="phishing-formula">$$ 단축 수식 $$</div>
-     <p class="phishing-desc">실전 적용 팁 서술</p>
+     <p><strong>핵심 아이디어:</strong> 정석 유도를 건너뛰는 직관적 원리 및 가상 변위 법칙 적용</p>
+     <div class="phishing-formula">$$ F = \\frac{1}{2}V^2 \\frac{dC}{dx} $$</div>
+     <p class="phishing-desc">실전 시험 적용 팁 및 주의점</p>
    </div>
 
 9. 시험 함정 주의 (#함정주의 / Trap Alert):
-   학생들이 부호 실수, 경계 조건 누락, 단위 착각 등으로 가장 자주 감점당하는 포인트를 아래 형식으로 강조:
+   학생들이 부호 실수, 경계 조건 누락, 단위/상수 착각 등으로 가장 자주 감점당하는 포인트를 아래 형식으로 강조:
    <div class="trap-box">
      <div class="trap-header">⚠️ #함정주의 (자주 낚이는 오개념 & 실수 포인트)</div>
      <p class="trap-desc">실수하기 쉬운 포인트 및 감점 방지 팁</p>
    </div>
 
 10. 시각화 다이어그램 / 물리 도식 (경량 인라인 SVG):
-    그림 설명이 꼭 필요한 경우 외부 링크를 쓰지 말고 20줄 이내의 단순한 <svg> 코드로 직접 삽입:
+    그림 설명이 꼭 필요한 경우 외부 링크 없이 20줄 이내의 단순한 <svg> 코드로 직접 삽입:
     <div class="svg-container">
       <svg viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg">
-        <!-- 선, 축, 화살표, 기본 도형 및 라벨 위주로 간결하게 구성 -->
+        <!-- 선, 축, 화살표, 기본 도형 및 텍스트 위주 구성 -->
       </svg>
       <div class="caption">도식 설명</div>
     </div>
@@ -216,23 +221,34 @@ def extract_and_design_multiple_files(file_list: list) -> str:
         res.raise_for_status()
         mime_type, _ = mimetypes.guess_type(item["name"])
         if not mime_type:
-            mime_type = "application/pdf" if item["name"].lower().endswith(".pdf") else "image/jpeg"
+            mime_type = (
+                "application/pdf"
+                if item["name"].lower().endswith(".pdf")
+                else "image/jpeg"
+            )
         content_payload.append({"mime_type": mime_type, "data": res.content})
 
     for attempt in range(3):
         try:
-            response = model.generate_content(content_payload, request_options={"timeout": 300})
+            response = model.generate_content(
+                content_payload, request_options={"timeout": 300}
+            )
             return response.text
         except Exception as e:
             if "429" in str(e) and attempt < 2:
-                print("  [알림] API 호출 제한 감지. 45초 후 자동 재시도합니다...")
+                print(
+                    "  [알림] API 호출 제한 감지. 45초 후 자동"
+                    " 재시도합니다..."
+                )
                 time.sleep(45)
             else:
                 raise e
 
 
 def build_full_html(title: str, content_html: str) -> str:
-    clean_html = re.sub(r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE)
+    clean_html = re.sub(
+        r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="ko">
@@ -327,7 +343,12 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
             path=output_pdf_path,
             format="A4",
             print_background=True,
-            margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"}
+            margin={
+                "top": "15mm",
+                "bottom": "15mm",
+                "left": "15mm",
+                "right": "15mm",
+            },
         )
         browser.close()
 
@@ -342,7 +363,9 @@ def update_notion_success(page_id: str, download_url: str):
             update_data["상태"] = {"select": {"name": "완료"}}
             notion.pages.update(page_id=page_id, properties=update_data)
         except Exception:
-            notion.pages.update(page_id=page_id, properties={"정리본 링크": {"url": download_url}})
+            notion.pages.update(
+                page_id=page_id, properties={"정리본 링크": {"url": download_url}}
+            )
 
 
 def main():
@@ -364,7 +387,10 @@ def main():
             if len(files) > 1:
                 main_title = f"{main_title}_외_{len(files)-1}건_통합본"
 
-            print(f"'{main_title}' (총 {len(files)}개 파일) 종합 분석 및 디자인 PDF 생성 중...")
+            print(
+                f"'{main_title}' (총 {len(files)}개 파일) 종합 분석 및 디자인"
+                " PDF 생성 중..."
+            )
 
             try:
                 body_html = extract_and_design_multiple_files(files)
@@ -374,7 +400,9 @@ def main():
                 render_html_to_pdf(full_html, temp_pdf_path)
 
                 print("  -> GitHub Storage에 통합본 업로드 중...")
-                pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{main_title}_정리본.pdf")
+                pdf_url = upload_pdf_to_github_release(
+                    temp_pdf_path, f"{main_title}_정리본.pdf"
+                )
                 print(f"  -> 다운로드 링크 생성 완료: {pdf_url}")
 
                 update_notion_success(page_id, pdf_url)
