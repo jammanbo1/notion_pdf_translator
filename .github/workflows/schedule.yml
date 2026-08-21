@@ -1,0 +1,31 @@
+name: Notion PDF Auto Processor
+
+on:
+  schedule:
+    # 한국 시간 기준 08:00 ~ 23:59 (매 15분마다 실행, 심야/새벽 제외)
+    - cron: '*/15 23,0-14 * * *'
+  workflow_dispatch: # Actions 탭에서 수동 실행(테스트) 버튼 활성화
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 환경 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 필수 패키지 설치
+        run: |
+          pip install notion-client python-dotenv requests google-generativeai
+
+      - name: 자동화 파이썬 스크립트 실행
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DB_ID: ${{ secrets.NOTION_DB_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python notion_to_gemini.py
