@@ -136,9 +136,23 @@ def extract_and_design_multiple_files(file_list: list) -> str:
 3. 수식은 반드시 LaTeX 문법($$...$$ 또는 $...$)으로 작성:
    <div class="formula-box">수식 설명 및 $$ E = mc^2 $$</div>
 4. 핵심 포인트: <div class="callout-box"><strong> Key Point:</strong> ... </div>
-5. 관련 Unsplash 무료 이미지 1개 배치:
+5. 개념 간의 대칭/비교 구조, 상호 관계도(예: 전기장 vs 자기장, Bound vs Free 등)가 필요한 경우 다음 대칭 다이어그램 구조를 적극 활용:
+   <div class="concept-map">
+     <div class="map-col">
+       <div class="map-header">좌측 개념명 (예: 전기적 특성 / Bound Charge)</div>
+       <div class="map-formula">수식 (예: $$ \\nabla \\cdot \\vec{P} = -\\rho_b $$)</div>
+       <p class="map-desc">설명 및 경계 조건</p>
+     </div>
+     <div class="map-arrow">$$\\longleftrightarrow$$</div>
+     <div class="map-col">
+       <div class="map-header">우측 개념명 (예: 자기적 특성 / Bound Current)</div>
+       <div class="map-formula">수식 (예: $$ \\nabla \\times \\vec{M} = \\vec{J}_b $$)</div>
+       <p class="map-desc">설명 및 경계 조건</p>
+     </div>
+   </div>
+6. 관련 Unsplash 무료 이미지 1개 배치:
    <div class="image-container"><img src="https://source.unsplash.com/800x400/?{주제영문키워드}" alt="참고이미지" onerror="this.style.display='none'"/><div class="caption">관련 참고 자료</div></div>
-6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+7. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
     content_payload.append(prompt)
 
@@ -192,6 +206,15 @@ def build_full_html(title: str, content_html: str) -> str:
   .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
   .formula-box {{ background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #4A5568; border-radius: 4px 8px 8px 4px; padding: 12px; margin: 12px 0; }}
   .callout-box {{ background-color: #FFFDF5; border-left: 5px solid #D69E2E; padding: 12px 14px; margin: 12px 0; border-radius: 4px 8px 8px 4px; }}
+  
+  /* 대칭 마인드맵 / 다이어그램 박스 스타일 */
+  .concept-map {{ display: flex; justify-content: space-between; align-items: stretch; background-color: #F7FAFC; border: 1px solid #CBD5E0; border-radius: 8px; padding: 14px; margin: 16px 0; gap: 10px; }}
+  .map-col {{ flex: 1; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: flex-start; }}
+  .map-header {{ font-weight: 700; font-size: 13px; color: #2B6CB0; margin-bottom: 8px; border-bottom: 1.5px solid #E2E8F0; padding-bottom: 4px; text-align: center; }}
+  .map-formula {{ background-color: #F8FAFC; border-radius: 4px; padding: 6px; margin: 6px 0; text-align: center; border: 1px dashed #CBD5E0; }}
+  .map-arrow {{ display: flex; align-items: center; justify-content: center; font-size: 20px; color: #4A5568; padding: 0 4px; }}
+  .map-desc {{ font-size: 11px; color: #4A5568; margin: 4px 0 0 0; line-height: 1.5; }}
+
   .image-container {{ text-align: center; margin: 16px 0; }}
   .image-container img {{ max-width: 90%; max-height: 220px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
   .caption {{ font-size: 11px; color: #718096; margin-top: 4px; }}
