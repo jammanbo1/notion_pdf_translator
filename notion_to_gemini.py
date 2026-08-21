@@ -47,7 +47,7 @@ def upload_pdf_to_drive(file_path: str, file_name: str) -> str:
 
     media = MediaFileUpload(file_path, mimetype="application/pdf", resumable=True)
 
-    # 1. 파일 생성 및 업로드
+    # 1. 파일 업로드 및 webViewLink 바로 받아오기
     uploaded_file = (
         drive_service.files()
         .create(
@@ -60,25 +60,13 @@ def upload_pdf_to_drive(file_path: str, file_name: str) -> str:
     )
 
     file_id = uploaded_file.get("id")
-
-    # 2. 링크 공유 권한 부여 (누구나 보기 가능)
-    try:
-        drive_service.permissions().create(
-            fileId=file_id,
-            body={"type": "anyone", "role": "reader"},
-            supportsAllDrives=True,
-        ).execute()
-    except Exception as e:
-        print(f"  (권한 설정 안내: {e})")
-
-    # 3. 링크 반환
     web_link = uploaded_file.get("webViewLink")
+
     if not web_link:
-        web_link = f"https://drive.google.com/file/d/{file_id}/view"
+        web_link = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
 
     return web_link
-
-
+    
 def get_data_source_id():
     database = notion.databases.retrieve(database_id=NOTION_DB_ID)
     data_sources = database.get("data_sources", [])
