@@ -214,6 +214,12 @@ def extract_and_design_multiple_files(file_list: list) -> str:
 
 12. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
+# prompt 작성 규칙에 추가
+"""
+13. 필기 오류 및 오개념 능동 검증 (Fact-Check):
+    원본 손글씨/문서에 물리적/수학적 오류, 계산 실수, 잘못된 공식 적용이 발견될 경우, 그대로 옮겨 쓰지 말고 올바른 내용으로 교정하여 작성하세요. 
+    치명적인 오개념이었던 경우 #함정주의 박스에 "원본 필기 오류 수정: [잘못된 점] -> [올바른 설명]" 형태로 명시하세요.
+"""
     content_payload.append(prompt)
 
     for item in file_list:
