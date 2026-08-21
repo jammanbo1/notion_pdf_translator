@@ -1,6 +1,6 @@
 import os
 import re
-import json
+import time
 import tempfile
 import requests
 from dotenv import load_dotenv
@@ -8,65 +8,69 @@ from notion_client import Client
 import google.generativeai as genai
 from playwright.sync_api import sync_playwright
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-
 load_dotenv()
 
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 NOTION_DB_ID = os.environ["NOTION_DB_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID", "").strip()
-GDRIVE_JSON_STR = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
+
+# 일일 1,000회 / 분당 15회로 무료 쿼터가 가장 넉넉한 표준 모델
 model = genai.GenerativeModel("gemini-3.5-flash-lite")
 
 
-def get_drive_service():
-    """Google Drive API 서비스 클라이언트 생성 (전체 드라이브 권한 부여)"""
-    service_account_info = json.loads(GDRIVE_JSON_STR)
-    creds = service_account.Credentials.from_service_account_info(
-        service_account_info,
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    return build("drive", "v3", credentials=creds)
-
-
-def upload_pdf_to_drive(file_path: str, file_name: str) -> str:
-    """PDF를 구글 드라이브에 업로드하고 공유 URL을 반환"""
-    drive_service = get_drive_service()
-
-    file_metadata = {
-        "name": file_name,
+def get_or_create_release(tag="pdf-reports"):
+    """GitHub Release 생성 또는 기존 릴리즈 정보 가져오기"""
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
     }
-    if GDRIVE_FOLDER_ID:
-        file_metadata["parents"] = [GDRIVE_FOLDER_ID]
+    url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/tags/{tag}"
+    res = requests.get(url, headers=headers)
 
-    media = MediaFileUpload(file_path, mimetype="application/pdf", resumable=True)
+    if res.status_code == 200:
+        return res.json()
 
-    # 1. 파일 업로드 및 webViewLink 바로 받아오기
-    uploaded_file = (
-        drive_service.files()
-        .create(
-            body=file_metadata,
-            media_body=media,
-            fields="id, webViewLink",
-            supportsAllDrives=True,
-        )
-        .execute()
-    )
+    # 릴리즈가 없으면 신규 생성
+    create_url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases"
+    payload = {
+        "tag_name": tag,
+        "name": "Generated PDF Reports",
+        "body": "자동 생성된 PDF 정리본 보관소입니다.",
+        "draft": False,
+        "prerelease": False
+    }
+    create_res = requests.post(create_url, headers=headers, json=payload)
+    create_res.raise_for_status()
+    return create_res.json()
 
-    file_id = uploaded_file.get("id")
-    web_link = uploaded_file.get("webViewLink")
 
-    if not web_link:
-        web_link = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
+def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
+    """PDF를 GitHub Release Asset으로 업로드하고 다운로드 직링크 반환"""
+    release = get_or_create_release()
+    upload_url_template = release["upload_url"]
+    upload_url = upload_url_template.replace("{?name,label}", "")
 
-    return web_link
-    
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Content-Type": "application/pdf",
+    }
+
+    # 파일명 충돌 방지 및 안전한 이름 생성
+    safe_name = f"{int(time.time())}_{os.path.basename(file_path)}"
+    params = {"name": safe_name}
+
+    with open(file_path, "rb") as f:
+        res = requests.post(upload_url, headers=headers, params=params, data=f)
+        res.raise_for_status()
+        asset_data = res.json()
+        return asset_data["browser_download_url"]
+
+
 def get_data_source_id():
     database = notion.databases.retrieve(database_id=NOTION_DB_ID)
     data_sources = database.get("data_sources", [])
@@ -103,7 +107,7 @@ def get_unprocessed_items():
         elif status_type == "select" and status_prop.get("select"):
             current_status = status_prop["select"].get("name", "")
 
-        # '처리완료' 또는 '완료'가 아닌 항목 처리
+        # '처리완료' 또는 '완료'가 아닌 미처리 항목만 선별
         if current_status not in ["처리완료", "완료"]:
             unprocessed.append(page)
 
@@ -132,7 +136,7 @@ def extract_and_design_with_gemini(pdf_url: str) -> str:
 
     prompt = """
 당신은 최고의 문서 디자이너이자 요약 정리 전문가입니다.
-주어진 PDF 문서 내용을 분석하여 이해하기 쉽고 시각적으로 매우 수려한 요약 리포트를 HTML 본문 코드로 작성해주세요.
+주어진 PDF 문서 내용을 분석하여 가독성이 뛰어난 요약 리포트를 HTML 본문 코드로 작성해주세요.
 
 [작성 규칙]
 1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: ... </div>
@@ -144,11 +148,20 @@ def extract_and_design_with_gemini(pdf_url: str) -> str:
    <div class="image-container"><img src="https://source.unsplash.com/800x400/?{주제영문키워드}" alt="참고이미지" onerror="this.style.display='none'"/><div class="caption">관련 참고 자료</div></div>
 6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
-    response = model.generate_content(
-        [prompt, {"mime_type": "application/pdf", "data": pdf_bytes}],
-        request_options={"timeout": 300}
-    )
-    return response.text
+    # 429 요청 한도 감지 시 지수 백오프 자동 재시도
+    for attempt in range(3):
+        try:
+            response = model.generate_content(
+                [prompt, {"mime_type": "application/pdf", "data": pdf_bytes}],
+                request_options={"timeout": 300}
+            )
+            return response.text
+        except Exception as e:
+            if "429" in str(e) and attempt < 2:
+                print("  [알림] API 호출 제한 감지. 45초 후 자동 재시도합니다...")
+                time.sleep(45)
+            else:
+                raise e
 
 
 def build_full_html(title: str, content_html: str) -> str:
@@ -212,13 +225,11 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser.close()
 
 
-def update_notion_success(page_id: str, drive_url: str):
-    """Notion의 '정리본 링크' 속성에 URL 등록 및 '상태'를 '완료'로 변경"""
+def update_notion_success(page_id: str, download_url: str):
+    """Notion의 '정리본 링크'에 URL 등록 및 상태를 '완료'로 변경"""
     update_data = {
-        "정리본 링크": {"url": drive_url}
+        "정리본 링크": {"url": download_url}
     }
-    
-    # Status 타입과 Select 타입 모두 호환되도록 처리
     try:
         update_data["상태"] = {"status": {"name": "완료"}}
         notion.pages.update(page_id=page_id, properties=update_data)
@@ -226,10 +237,8 @@ def update_notion_success(page_id: str, drive_url: str):
         try:
             update_data["상태"] = {"select": {"name": "완료"}}
             notion.pages.update(page_id=page_id, properties=update_data)
-        except Exception as e:
-            print(f"  (상태 속성 업데이트 건너뜀: {e})")
-            # 상태 변경 실패 시 링크만 업데이트
-            notion.pages.update(page_id=page_id, properties={"정리본 링크": {"url": drive_url}})
+        except Exception:
+            notion.pages.update(page_id=page_id, properties={"정리본 링크": {"url": download_url}})
 
 
 def main():
@@ -253,7 +262,7 @@ def main():
                 print(f"'{file_name}' 분석 및 디자인 PDF 생성 중...")
 
                 try:
-                    # 1. Gemini로 디자인 본문 HTML 생성
+                    # 1. Gemini 요약 및 본문 HTML 획득
                     body_html = extract_and_design_with_gemini(pdf["url"])
                     full_html = build_full_html(base_name, body_html)
 
@@ -261,14 +270,16 @@ def main():
                     temp_pdf_path = os.path.join(temp_dir, f"{base_name}_정리본.pdf")
                     render_html_to_pdf(full_html, temp_pdf_path)
 
-                    # 3. Google Drive 업로드
-                    print("  -> Google Drive 업로드 중...")
-                    drive_link = upload_pdf_to_drive(temp_pdf_path, f"{base_name}_정리본.pdf")
-                    print(f"  -> Drive 링크 생성 완료: {drive_link}")
+                    # 3. GitHub Releases에 PDF 업로드 및 다운로드 링크 획득
+                    print("  -> GitHub Storage에 업로드 중...")
+                    pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{base_name}_정리본.pdf")
+                    print(f"  -> 다운로드 링크 생성 완료: {pdf_url}")
 
-                    # 4. Notion 속성 업데이트
-                    update_notion_success(page_id, drive_link)
-                    print("  -> Notion '정리본 링크' 및 상태 업데이트 완료!\n")
+                    # 4. Notion 표 업데이트
+                    update_notion_success(page_id, pdf_url)
+                    print("  -> Notion 업데이트 완료!\n")
+
+                    time.sleep(5)
 
                 except Exception as e:
                     print(f"  -> 실패: {e}\n")
