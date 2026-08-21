@@ -126,33 +126,39 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list) -> str:
     content_payload = []
     prompt = """
-당신은 최고의 문서 디자이너이자 전공 학업 정리 전문가입니다.
-첨부된 모든 문서/필기 이미지 자료들을 순서대로 종합하여 하나의 통일되고 완성도 높은 요약 리포트를 HTML 코드로 작성해주세요.
-손글씨 필기 노트 사진인 경우 글씨와 수식을 정확히 판독하여 누락 없이 정리하세요.
+당신은 최고의 시험 대비 튜터이자 전공 학업 요약 전문가입니다.
+첨부된 모든 문서/손글씨 필기 자료를 순서대로 종합하여 시험 대비에 최적화된 고품질 요약 리포트를 HTML 코드로 작성해주세요.
 
 [작성 규칙]
-1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료를 아우르는 핵심 요약</div>
+1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
 2. 중요 키워드는 <span class="highlight">강조</span> 처리.
 3. 수식은 반드시 LaTeX 문법($$...$$ 또는 $...$)으로 작성:
    <div class="formula-box">수식 설명 및 $$ E = mc^2 $$</div>
 4. 핵심 포인트: <div class="callout-box"><strong> Key Point:</strong> ... </div>
-5. 개념 간의 대칭/비교 구조, 상호 관계도(예: 전기장 vs 자기장, Bound vs Free 등)가 필요한 경우 다음 대칭 다이어그램 구조를 적극 활용:
+5. 개념 간 대칭/비교 구조가 있는 경우 대칭 다이어그램 박스 활용:
    <div class="concept-map">
      <div class="map-col">
        <div class="map-header">좌측 개념명</div>
-       <div class="map-formula">수식 (예: $$ \nabla \cdot \vec{P} = -\rho_b $$)</div>
-       <p class="map-desc">설명 및 조건</p>
+       <div class="map-formula">$$ 수식 $$</div>
+       <p class="map-desc">설명</p>
      </div>
-     <div class="map-arrow">$$\longleftrightarrow$$</div>
+     <div class="map-arrow">$$\\longleftrightarrow$$</div>
      <div class="map-col">
        <div class="map-header">우측 개념명</div>
-       <div class="map-formula">수식 (예: $$ \nabla \times \vec{M} = \vec{J}_b $$)</div>
-       <p class="map-desc">설명 및 조건</p>
+       <div class="map-formula">$$ 수식 $$</div>
+       <p class="map-desc">설명</p>
      </div>
    </div>
-6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+6. 시험용 숏컷 / 극한 단축 풀이 (#보이스피싱):
+   강의자료 원문에 설명이 없더라도, 시험 시간을 극단적으로 줄일 수 있는 방법(예: 대칭성 이용, 차원 분석, 극한 조건 대입, 공식 치환 꼼수, 직관적 풀이 등)이 존재한다면 반드시 아래 전용 박스를 추가하세요:
+   <div class="voice-phishing-box">
+     <div class="phishing-header">⚡ #보이스피싱 (실전 초단축 풀이법)</div>
+     <p><strong>핵심 아이디어:</strong> 정석 계산을 생략하고 답을 바로 도출하는 직관적 원리</p>
+     <div class="phishing-formula">$$ 단축 수식/조건식 $$</div>
+     <p class="phishing-desc">실제 시험 문제에 적용하는 구체적인 팁 서술</p>
+   </div>
+7. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
-
     content_payload.append(prompt)
 
     for item in file_list:
@@ -206,7 +212,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .formula-box {{ background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #4A5568; border-radius: 4px 8px 8px 4px; padding: 12px; margin: 12px 0; }}
   .callout-box {{ background-color: #FFFDF5; border-left: 5px solid #D69E2E; padding: 12px 14px; margin: 12px 0; border-radius: 4px 8px 8px 4px; }}
   
-  /* 대칭 마인드맵 / 다이어그램 박스 스타일 */
+  /* 대칭 마인드맵 박스 */
   .concept-map {{ display: flex; justify-content: space-between; align-items: stretch; background-color: #F7FAFC; border: 1px solid #CBD5E0; border-radius: 8px; padding: 14px; margin: 16px 0; gap: 10px; }}
   .map-col {{ flex: 1; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; justify-content: flex-start; }}
   .map-header {{ font-weight: 700; font-size: 13px; color: #2B6CB0; margin-bottom: 8px; border-bottom: 1.5px solid #E2E8F0; padding-bottom: 4px; text-align: center; }}
@@ -214,9 +220,11 @@ def build_full_html(title: str, content_html: str) -> str:
   .map-arrow {{ display: flex; align-items: center; justify-content: center; font-size: 20px; color: #4A5568; padding: 0 4px; }}
   .map-desc {{ font-size: 11px; color: #4A5568; margin: 4px 0 0 0; line-height: 1.5; }}
 
-  .image-container {{ text-align: center; margin: 16px 0; }}
-  .image-container img {{ max-width: 90%; max-height: 220px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-  .caption {{ font-size: 11px; color: #718096; margin-top: 4px; }}
+  /* #보이스피싱 전용 숏컷 스타일 */
+  .voice-phishing-box {{ background-color: #FAF5FF; border: 1.5px solid #D6BCFA; border-left: 5px solid #805AD5; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 16px 0; }}
+  .phishing-header {{ font-weight: 800; font-size: 13px; color: #6B46C1; margin-bottom: 6px; }}
+  .phishing-formula {{ background-color: #FFFFFF; border: 1px dashed #B794F4; border-radius: 4px; padding: 8px; margin: 8px 0; text-align: center; }}
+  .phishing-desc {{ font-size: 12px; color: #4A5568; margin: 0; line-height: 1.6; }}
 </style>
 </head>
 <body>
