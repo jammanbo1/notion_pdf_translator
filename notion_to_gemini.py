@@ -127,7 +127,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
     content_payload = []
     prompt = """
 당신은 최고의 시험 대비 튜터이자 전공 학업 요약 전문가입니다.
-첨부된 모든 문서/손글씨 필기 자료를 순서대로 종합하여 시험 대비에 최적화된 고품질 요약 리포트를 HTML 코드로 작성해주세요.
+첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론과 실전 계산이 완벽히 연결되는 고품질 요약 리포트를 HTML 코드로 작성해주세요.
 
 [작성 규칙]
 1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
@@ -149,15 +149,31 @@ def extract_and_design_multiple_files(file_list: list) -> str:
        <p class="map-desc">설명</p>
      </div>
    </div>
-6. 시험용 숏컷 / 극한 단축 풀이 (#보이스피싱):
-   강의자료 원문에 설명이 없더라도, 시험 시간을 극단적으로 줄일 수 있는 방법(예: 대칭성 이용, 차원 분석, 극한 조건 대입, 공식 치환 꼼수, 직관적 풀이 등)이 존재한다면 반드시 아래 전용 박스를 추가하세요:
+
+6. 실전 적용 예제 문항 및 계산 전개 (필수 추가):
+   학습한 공식/개념이 실제 시험 문제에 어떻게 적용되는지 보여주기 위해, 원문에 예제가 있다면 계산 과정을 자세히 복원하고, 원문에 예제가 없더라도 가장 대표적인 빈출 예제 1~2개를 생성하여 다음 형식으로 작성하세요:
+   <div class="example-box">
+     <div class="example-header">📝 실전 적용 예제 (Example Problem)</div>
+     <div class="example-question"><strong>[문제]</strong> 문제 상황 및 주어진 조건 제시</div>
+     <div class="example-solution">
+       <div class="solution-title"> 정석 풀이 및 계산 과정:</div>
+       <p>1단계: 조건 분석 및 적용 공식 선정</p>
+       <div class="calc-step">$$ \\text{수식 전개} $$</div>
+       <p>2단계: 수치 대입 및 최종 결과 도출</p>
+       <div class="calc-step">$$ \\therefore \\text{결과값} $$</div>
+     </div>
+   </div>
+
+7. 시험용 숏컷 / 극한 단축 풀이 (#보이스피싱):
+   위 예제나 개념에서 정석 계산을 대폭 줄일 수 있는 방법(대칭성 이용, 차원 분석, 극한 조건 대입, 공식 치환 꼼수 등)이 있다면 아래 전용 박스를 반드시 추가하세요:
    <div class="voice-phishing-box">
      <div class="phishing-header">⚡ #보이스피싱 (실전 초단축 풀이법)</div>
      <p><strong>핵심 아이디어:</strong> 정석 계산을 생략하고 답을 바로 도출하는 직관적 원리</p>
      <div class="phishing-formula">$$ 단축 수식/조건식 $$</div>
      <p class="phishing-desc">실제 시험 문제에 적용하는 구체적인 팁 서술</p>
    </div>
-7. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+
+8. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
     content_payload.append(prompt)
 
@@ -219,6 +235,14 @@ def build_full_html(title: str, content_html: str) -> str:
   .map-formula {{ background-color: #F8FAFC; border-radius: 4px; padding: 6px; margin: 6px 0; text-align: center; border: 1px dashed #CBD5E0; }}
   .map-arrow {{ display: flex; align-items: center; justify-content: center; font-size: 20px; color: #4A5568; padding: 0 4px; }}
   .map-desc {{ font-size: 11px; color: #4A5568; margin: 4px 0 0 0; line-height: 1.5; }}
+
+  /* 실전 적용 예제 박스 스타일 */
+  .example-box {{ background-color: #F7FAFC; border: 1px solid #CBD5E0; border-left: 5px solid #319795; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 18px 0; }}
+  .example-header {{ font-weight: 800; font-size: 13px; color: #285E61; margin-bottom: 8px; }}
+  .example-question {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 4px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; }}
+  .example-solution {{ padding-left: 4px; font-size: 12px; }}
+  .solution-title {{ font-weight: 700; color: #2C7A7B; margin-bottom: 4px; }}
+  .calc-step {{ background-color: #FFFFFF; border: 1px solid #EDF2F7; border-radius: 4px; padding: 8px; margin: 6px 0 10px 0; text-align: center; }}
 
   /* #보이스피싱 전용 숏컷 스타일 */
   .voice-phishing-box {{ background-color: #FAF5FF; border: 1.5px solid #D6BCFA; border-left: 5px solid #805AD5; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 16px 0; }}
