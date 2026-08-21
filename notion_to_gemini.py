@@ -22,7 +22,7 @@ GDRIVE_JSON_STR = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-3.6-flash")
+model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 
 def get_drive_service():
