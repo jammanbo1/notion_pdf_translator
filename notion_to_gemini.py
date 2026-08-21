@@ -36,30 +36,47 @@ def get_drive_service():
 
 
 def upload_pdf_to_drive(file_path: str, file_name: str) -> str:
-    """PDF를 구글 드라이브에 업로드하고 열람 링크(URL)를 반환"""
+    """PDF를 구글 드라이브에 업로드하고 공유 URL을 반환"""
     drive_service = get_drive_service()
-    
+
     file_metadata = {
         "name": file_name,
-        "parents": [GDRIVE_FOLDER_ID] if GDRIVE_FOLDER_ID else []
     }
+    if GDRIVE_FOLDER_ID:
+        file_metadata["parents"] = [GDRIVE_FOLDER_ID]
+
     media = MediaFileUpload(file_path, mimetype="application/pdf", resumable=True)
-    
-    uploaded_file = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id, webViewLink"
-    ).execute()
-    
+
+    # 1. 파일 생성 및 업로드
+    uploaded_file = (
+        drive_service.files()
+        .create(
+            body=file_metadata,
+            media_body=media,
+            fields="id, webViewLink",
+            supportsAllDrives=True,
+        )
+        .execute()
+    )
+
     file_id = uploaded_file.get("id")
-    
-    # 링크가 있는 모든 사용자가 읽을 수 있도록 공개 권한 부여
-    drive_service.permissions().create(
-        fileId=file_id,
-        body={"type": "anyone", "role": "reader"}
-    ).execute()
-    
-    return uploaded_file.get("webViewLink")
+
+    # 2. 링크 공유 권한 부여
+    try:
+        drive_service.permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"},
+            supportsAllDrives=True,
+        ).execute()
+    except Exception as e:
+        print(f"  (권한 설정 건너뜀: {e})")
+
+    # 3. 링크 반환 (기본 링크가 없으면 직접 URL 조합)
+    web_link = uploaded_file.get("webViewLink")
+    if not web_link:
+        web_link = f"https://drive.google.com/file/d/{file_id}/view"
+
+    return web_link
 
 
 def get_data_source_id():
