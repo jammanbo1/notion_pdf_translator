@@ -127,7 +127,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
     content_payload = []
     prompt = """
 당신은 최고의 시험 대비 튜터이자 전공 학업 요약 전문가입니다.
-첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론, 선수 개념 복습, 실전 계산, 다이어그램이 조화된 고품질 요약 리포트를 HTML 코드로 작성해주세요.
+첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론, 선수 개념 복습, 실전 계산, 함정 방지, 요약 치트시트가 조화된 최고급 요약 리포트를 HTML 코드로 작성해주세요.
 
 [작성 규칙]
 1. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 핵심 개념 요약</div>
@@ -136,7 +136,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
    <div class="formula-box">수식 설명 및 $$ E = mc^2 $$</div>
 
 4. 💡 Recall (선수 개념 & 까먹기 쉬운 필수 아이디어):
-   중요한 개념이나 복잡한 수식 유도를 전개하기 전에, 이해에 꼭 필요한 선수 지식(예: 미적분 공식, 삼각함수 항등식, 이전 단원 공식, 물리적 기본 전제)이 있다면 설명 직전에 반드시 아래 형식으로 박스를 배치하세요:
+   중요 개념/증명 전개 전, 필요한 선수 지식(미적분 공식, 삼각함수, 이전 단원 공식 등)이 있다면 아래 박스를 배치:
    <div class="recall-box">
      <div class="recall-header">💡 Recall (사전 필수 개념 & 리마인드)</div>
      <p><strong>꼭 기억해야 할 배경 지식:</strong> 설명 및 적용될 수학적/물리적 전제</p>
@@ -161,7 +161,7 @@ def extract_and_design_multiple_files(file_list: list) -> str:
    </div>
 
 7. 실전 적용 예제 문항 및 계산 전개:
-   원문의 예제를 살리거나, 핵심 공식마다 빈출 예제 1~2개를 다음 형식으로 작성:
+   원문 예제를 살리거나, 핵심 공식마다 대표 예제 1~2개를 다음 형식으로 작성:
    <div class="example-box">
      <div class="example-header">📝 실전 적용 예제 (Example Problem)</div>
      <div class="example-question"><strong>[문제]</strong> 문제 상황 및 조건</div>
@@ -182,16 +182,32 @@ def extract_and_design_multiple_files(file_list: list) -> str:
      <p class="phishing-desc">실전 적용 팁 서술</p>
    </div>
 
-9. 시각화 다이어그램 / 물리 도식 (인라인 SVG):
-   좌표계, 단면도, 회로도 등 그림 설명이 필요한 경우 순수 <svg> 코드로 직접 삽입:
-   <div class="svg-container">
-     <svg viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg">
-       <!-- 선, 도형, 화살표, 라벨 구성 -->
-     </svg>
-     <div class="caption">도식 설명</div>
+9. 시험 함정 주의 (#함정주의 / Trap Alert):
+   학생들이 부호 실수, 경계 조건 누락, 단위 착각 등으로 가장 자주 감점당하는 포인트를 아래 형식으로 강조:
+   <div class="trap-box">
+     <div class="trap-header">⚠️ #함정주의 (자주 낚이는 오개념 & 실수 포인트)</div>
+     <p class="trap-desc">실수하기 쉬운 포인트 및 감점 방지 팁</p>
    </div>
 
-10. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+10. 시각화 다이어그램 / 물리 도식 (경량 인라인 SVG):
+    그림 설명이 꼭 필요한 경우 외부 링크를 쓰지 말고 20줄 이내의 단순한 <svg> 코드로 직접 삽입:
+    <div class="svg-container">
+      <svg viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg">
+        <!-- 선, 축, 화살표, 기본 도형 및 라벨 위주로 간결하게 구성 -->
+      </svg>
+      <div class="caption">도식 설명</div>
+    </div>
+
+11. 최하단 단원 공식 치트시트 (Cheat-Sheet Table):
+    문서 맨 끝에는 시험 직전 1분 복습용으로 본문의 모든 핵심 수식과 조건을 요약한 테이블을 반드시 배치:
+    <table class="cheat-sheet-table">
+      <thead><tr><th>개념/법칙명</th><th>핵심 공식 (LaTeX)</th><th>적용 조건 / 주의사항</th></tr></thead>
+      <tbody>
+        <tr><td>법칙명</td><td>$$ 수식 $$</td><td>조건 및 핵심 설명</td></tr>
+      </tbody>
+    </table>
+
+12. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
     content_payload.append(prompt)
 
@@ -246,7 +262,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .formula-box {{ background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #4A5568; border-radius: 4px 8px 8px 4px; padding: 12px; margin: 12px 0; }}
   .callout-box {{ background-color: #FFFDF5; border-left: 5px solid #D69E2E; padding: 12px 14px; margin: 12px 0; border-radius: 4px 8px 8px 4px; }}
   
-  /* Recall (선수 개념 & 리마인드) 전용 박스 스타일 */
+  /* Recall 박스 */
   .recall-box {{ background-color: #FFFAF0; border: 1.5px solid #FBD38D; border-left: 5px solid #DD6B20; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin: 14px 0; }}
   .recall-header {{ font-weight: 800; font-size: 12.5px; color: #C05621; margin-bottom: 6px; }}
   .recall-formula {{ background-color: #FFFFFF; border: 1px dashed #ED8936; border-radius: 4px; padding: 6px; margin: 6px 0; text-align: center; }}
@@ -273,10 +289,21 @@ def build_full_html(title: str, content_html: str) -> str:
   .phishing-formula {{ background-color: #FFFFFF; border: 1px dashed #B794F4; border-radius: 4px; padding: 8px; margin: 8px 0; text-align: center; }}
   .phishing-desc {{ font-size: 12px; color: #4A5568; margin: 0; line-height: 1.6; }}
 
+  /* #함정주의 전용 박스 스타일 */
+  .trap-box {{ background-color: #FFF5F5; border: 1.5px solid #FEB2B2; border-left: 5px solid #E53E3E; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin: 14px 0; }}
+  .trap-header {{ font-weight: 800; font-size: 12.5px; color: #C53030; margin-bottom: 6px; }}
+  .trap-desc {{ font-size: 12px; color: #4A5568; margin: 0; line-height: 1.6; }}
+
   /* 인라인 SVG 다이어그램 컨테이너 */
   .svg-container {{ text-align: center; margin: 18px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }}
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
   .caption {{ font-size: 11px; color: #718096; margin-top: 6px; text-align: center; }}
+
+  /* Cheat-Sheet 요약 표 스타일 */
+  .cheat-sheet-table {{ width: 100%; border-collapse: collapse; margin: 20px 0 10px 0; font-size: 12px; }}
+  .cheat-sheet-table th {{ background-color: #2B6CB0; color: #FFFFFF; font-weight: 700; padding: 8px 10px; border: 1px solid #CBD5E0; text-align: center; }}
+  .cheat-sheet-table td {{ border: 1px solid #E2E8F0; padding: 8px 10px; text-align: center; background-color: #FFFFFF; }}
+  .cheat-sheet-table tr:nth-child(even) td {{ background-color: #F7FAFC; }}
 </style>
 </head>
 <body>
