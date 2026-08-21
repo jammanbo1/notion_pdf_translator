@@ -1,13 +1,13 @@
 name: Notion to Gemini PDF Sync
 
 on:
-  workflow_dispatch: # GitHub Actions 탭에서 버튼을 눌러 수동 실행
+  workflow_dispatch:
 
 jobs:
   build-and-run:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # GitHub Release 파일 업로드를 위해 쓰기 권한 부여
+      contents: write
 
     steps:
       - name: 저장소 체크아웃
@@ -17,7 +17,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: 필수 패키지 설치
         run: |
