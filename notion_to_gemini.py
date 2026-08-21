@@ -26,58 +26,50 @@ model = genai.GenerativeModel("gemini-3.6-flash")
 
 
 def get_drive_service():
-    """Google Drive API 서비스 클라이언트 생성"""
+    """Google Drive API 서비스 클라이언트 생성 (전체 드라이브 권한 부여)"""
     service_account_info = json.loads(GDRIVE_JSON_STR)
     creds = service_account.Credentials.from_service_account_info(
         service_account_info,
-        scopes=["https://www.googleapis.com/auth/drive.file"]
+        scopes=["https://www.googleapis.com/auth/drive"]
     )
     return build("drive", "v3", credentials=creds)
-
 
 def upload_pdf_to_drive(file_path: str, file_name: str) -> str:
     """PDF를 구글 드라이브에 업로드하고 공유 URL을 반환"""
     drive_service = get_drive_service()
-
+    
     file_metadata = {
         "name": file_name,
     }
     if GDRIVE_FOLDER_ID:
-        file_metadata["parents"] = [GDRIVE_FOLDER_ID]
+        file_metadata["parents"] = [GDRIVE_FOLDER_ID.strip()]
 
     media = MediaFileUpload(file_path, mimetype="application/pdf", resumable=True)
-
-    # 1. 파일 생성 및 업로드
-    uploaded_file = (
-        drive_service.files()
-        .create(
-            body=file_metadata,
-            media_body=media,
-            fields="id, webViewLink",
-            supportsAllDrives=True,
-        )
-        .execute()
-    )
-
+    
+    uploaded_file = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id, webViewLink",
+        supportsAllDrives=True
+    ).execute()
+    
     file_id = uploaded_file.get("id")
-
-    # 2. 링크 공유 권한 부여
+    
+    # 링크가 있는 모든 사용자가 열람할 수 있도록 권한 설정
     try:
         drive_service.permissions().create(
             fileId=file_id,
             body={"type": "anyone", "role": "reader"},
-            supportsAllDrives=True,
+            supportsAllDrives=True
         ).execute()
     except Exception as e:
-        print(f"  (권한 설정 건너뜀: {e})")
-
-    # 3. 링크 반환 (기본 링크가 없으면 직접 URL 조합)
+        print(f"  (권한 설정 안내: {e})")
+    
     web_link = uploaded_file.get("webViewLink")
     if not web_link:
         web_link = f"https://drive.google.com/file/d/{file_id}/view"
-
+        
     return web_link
-
 
 def get_data_source_id():
     database = notion.databases.retrieve(database_id=NOTION_DB_ID)
