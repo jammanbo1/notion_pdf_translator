@@ -18,26 +18,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Playwright 브라우저 바이너리 캐시 설정 (최초 1회 이후 설치 시간 5초로 단축)
-      - name: Playwright 브라우저 캐시
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-1.40.0
-
       - name: 필수 패키지 설치
         run: |
           python -m pip install --upgrade pip
           pip install notion-client google-generativeai requests python-dotenv playwright
-
-      - name: Playwright Chromium 설치 (캐시 미스 시에만 다운로드)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: playwright install --with-deps chromium
-
-      - name: Playwright 의존성 보장
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: playwright install-deps chromium
+          playwright install --with-deps chromium
 
       - name: Notion to Gemini 스크립트 실행
         env:
