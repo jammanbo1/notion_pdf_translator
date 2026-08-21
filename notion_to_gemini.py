@@ -17,12 +17,12 @@ load_dotenv()
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
 NOTION_DB_ID = os.environ["NOTION_DB_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID")
+GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID", "").strip()
 GDRIVE_JSON_STR = os.environ.get("GDRIVE_SERVICE_ACCOUNT_JSON")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-3.6-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 def get_drive_service():
@@ -34,42 +34,50 @@ def get_drive_service():
     )
     return build("drive", "v3", credentials=creds)
 
+
 def upload_pdf_to_drive(file_path: str, file_name: str) -> str:
     """PDF를 구글 드라이브에 업로드하고 공유 URL을 반환"""
     drive_service = get_drive_service()
-    
+
     file_metadata = {
         "name": file_name,
     }
     if GDRIVE_FOLDER_ID:
-        file_metadata["parents"] = [GDRIVE_FOLDER_ID.strip()]
+        file_metadata["parents"] = [GDRIVE_FOLDER_ID]
 
     media = MediaFileUpload(file_path, mimetype="application/pdf", resumable=True)
-    
-    uploaded_file = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id, webViewLink",
-        supportsAllDrives=True
-    ).execute()
-    
+
+    # 1. 파일 생성 및 업로드
+    uploaded_file = (
+        drive_service.files()
+        .create(
+            body=file_metadata,
+            media_body=media,
+            fields="id, webViewLink",
+            supportsAllDrives=True,
+        )
+        .execute()
+    )
+
     file_id = uploaded_file.get("id")
-    
-    # 링크가 있는 모든 사용자가 열람할 수 있도록 권한 설정
+
+    # 2. 링크 공유 권한 부여 (누구나 보기 가능)
     try:
         drive_service.permissions().create(
             fileId=file_id,
             body={"type": "anyone", "role": "reader"},
-            supportsAllDrives=True
+            supportsAllDrives=True,
         ).execute()
     except Exception as e:
         print(f"  (권한 설정 안내: {e})")
-    
+
+    # 3. 링크 반환
     web_link = uploaded_file.get("webViewLink")
     if not web_link:
         web_link = f"https://drive.google.com/file/d/{file_id}/view"
-        
+
     return web_link
+
 
 def get_data_source_id():
     database = notion.databases.retrieve(database_id=NOTION_DB_ID)
@@ -107,7 +115,8 @@ def get_unprocessed_items():
         elif status_type == "select" and status_prop.get("select"):
             current_status = status_prop["select"].get("name", "")
 
-        if current_status != "처리완료":
+        # '처리완료' 또는 '완료'가 아닌 항목 처리
+        if current_status not in ["처리완료", "완료"]:
             unprocessed.append(page)
 
     return unprocessed
@@ -216,18 +225,23 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
 
 
 def update_notion_success(page_id: str, drive_url: str):
-    """Notion의 '정리본 링크' 속성에 드라이브 URL을 넣고 '상태'를 '처리완료'로 변경"""
+    """Notion의 '정리본 링크' 속성에 URL 등록 및 '상태'를 '완료'로 변경"""
     update_data = {
         "정리본 링크": {"url": drive_url}
     }
     
-    # Select 또는 Status 형식 대응
+    # Status 타입과 Select 타입 모두 호환되도록 처리
     try:
-        update_data["상태"] = {"select": {"name": "처리완료"}}
+        update_data["상태"] = {"status": {"name": "완료"}}
         notion.pages.update(page_id=page_id, properties=update_data)
     except Exception:
-        update_data["상태"] = {"status": {"name": "처리완료"}}
-        notion.pages.update(page_id=page_id, properties=update_data)
+        try:
+            update_data["상태"] = {"select": {"name": "완료"}}
+            notion.pages.update(page_id=page_id, properties=update_data)
+        except Exception as e:
+            print(f"  (상태 속성 업데이트 건너뜀: {e})")
+            # 상태 변경 실패 시 링크만 업데이트
+            notion.pages.update(page_id=page_id, properties={"정리본 링크": {"url": drive_url}})
 
 
 def main():
