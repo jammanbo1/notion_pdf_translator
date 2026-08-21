@@ -139,21 +139,20 @@ def extract_and_design_multiple_files(file_list: list) -> str:
 5. 개념 간의 대칭/비교 구조, 상호 관계도(예: 전기장 vs 자기장, Bound vs Free 등)가 필요한 경우 다음 대칭 다이어그램 구조를 적극 활용:
    <div class="concept-map">
      <div class="map-col">
-       <div class="map-header">좌측 개념명 (예: 전기적 특성 / Bound Charge)</div>
-       <div class="map-formula">수식 (예: $$ \\nabla \\cdot \\vec{P} = -\\rho_b $$)</div>
-       <p class="map-desc">설명 및 경계 조건</p>
+       <div class="map-header">좌측 개념명</div>
+       <div class="map-formula">수식 (예: $$ \nabla \cdot \vec{P} = -\rho_b $$)</div>
+       <p class="map-desc">설명 및 조건</p>
      </div>
-     <div class="map-arrow">$$\\longleftrightarrow$$</div>
+     <div class="map-arrow">$$\longleftrightarrow$$</div>
      <div class="map-col">
-       <div class="map-header">우측 개념명 (예: 자기적 특성 / Bound Current)</div>
-       <div class="map-formula">수식 (예: $$ \\nabla \\times \\vec{M} = \\vec{J}_b $$)</div>
-       <p class="map-desc">설명 및 경계 조건</p>
+       <div class="map-header">우측 개념명</div>
+       <div class="map-formula">수식 (예: $$ \nabla \times \vec{M} = \vec{J}_b $$)</div>
+       <p class="map-desc">설명 및 조건</p>
      </div>
    </div>
-6. 관련 Unsplash 무료 이미지 1개 배치:
-   <div class="image-container"><img src="https://source.unsplash.com/800x400/?{주제영문키워드}" alt="참고이미지" onerror="this.style.display='none'"/><div class="caption">관련 참고 자료</div></div>
-7. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
+
     content_payload.append(prompt)
 
     for item in file_list:
