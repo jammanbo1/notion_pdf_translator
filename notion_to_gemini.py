@@ -139,26 +139,28 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-[핵심 서술 및 구조화 규칙]
-1. Mindset 액션 가이드 (<div class="mindset-box">):
+[핵심 서술 및 필기 메모 보존 규칙]
+1. 샤프/연필 필기 메모 집중 판독 & 체크 포인트 블록 (<div class="checkpoint-box">):
+   - 노트 본문 여백, 수식 옆, 상단에 '샤프/연필'이나 체크 표시(V, ★, #, ※)로 적힌 개인 메모를 정밀 판독할 것.
+   - 이를 <div class="checkpoint-box"><span class="checkpoint-tag">#체크포인트</span> [원문 코멘트] <span class="tutor-add">(튜터 첨언: [해당 메모와 관련된 엄밀한 보충 설명/수식])</span></div> 형태로 담백하고 직관적이게 배치할 것.
+
+2. Mindset 액션 가이드 (<div class="mindset-box">):
    - 문서 최상단에 해당 단원 문제를 접할 때 가장 먼저 의식해야 하는 핵심 행동 강령(Thinking Point)을 1줄로 명시할 것.
 
-2. 한 줄 직관 비유 (<div class="analogy-box">):
-   - 추상적이거나 헷갈리는 핵심 개념에 대해 직관적으로 이해할 수 있는 "한 줄 비유"를 반드시 포함할 것.
-   - 예: Dirichlet 조건 = "경계면의 온도/높이를 고정하는 것", Neumann 조건 = "경계면을 통과하는 열 유속/경사도를 고정하는 것"
-   - 예: Divergence = "단위 부피당 샘(Source)에서 뿜어져 나오는 순 유출량", Curl = "물 위에 띄운 작은 바람개비가 돌아가는 회전도"
+3. 한 줄 직관 비유 (<div class="analogy-box">):
+   - 추상적인 개념에 대해 1초 만에 이해되는 직관적인 비유를 1줄로 간결하게 명시할 것.
 
-3. 3단계 솔루션 프로세스 (3-Step Solution Flow):
+4. 3단계 솔루션 프로세스 (3-Step Solution Flow):
    - 대표 예제 풀이(<div class="example-box">) 작성 시: [Step 1. 모델링/조건 분석] -> [Step 2. 수학적 해법] -> [Step 3. 물리적 해석 및 검증] 단계를 준수할 것.
 
-4. 적용 한계 및 경계 조건 명시 (<div class="boundary-box">):
+5. 적용 한계 및 경계 조건 명시 (<div class="boundary-box">):
    - 공식이나 해법이 성립하는 유효 범위와, 성립하지 않는 예외 조건을 명확히 대조 서술할 것.
 
-5. 학문적 도메인 자동 판별 및 맞춤형 가중치:
+6. 학문적 도메인 자동 판별 및 맞춤형 가중치:
    - Mode A [물리 / 소자 / 자연과학 개념]: 물리적 메커니즘, 장(Field)/소자 시각화 인라인 SVG 도식 2개 이상 필수, 개념 대칭/비교 맵(<div class="concept-map">), #함정주의(<div class="trap-box">).
    - Mode B [수학 / 회로 / 신호 / 계산 알고리즘]: 정석 예제 풀이, #보이스피싱(<div class="voice-phishing-box">) 숏컷, Recall 선수 공식 박스.
 
-6. 공통 완성도 규칙:
+7. 공통 완성도 규칙:
    - 전단원 균형 커버리지: 모든 핵심 소단원 누락 없이 포함.
    - 표준 전공서 교차 검증: 엄밀한 수식 표기법과 부호 규약 적용.
    - 수식 표기: 모든 LaTeX 수식은 $...$(인라인) 또는 $$...$$(단독 블록)으로 정확히 표기.
@@ -237,6 +239,10 @@ def build_full_html(title: str, content_html: str) -> str:
   .mindset-box {{ background-color: #F0FFF4; border: 1.5px solid #9AE6B4; border-left: 5px solid #38A169; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin-bottom: 16px; }}
   .mindset-header {{ font-weight: 800; font-size: 12.5px; color: #22543D; margin-bottom: 4px; }}
   .mindset-desc {{ font-size: 12px; color: #276749; margin: 0; font-weight: 600; }}
+
+  .checkpoint-box {{ background-color: #FFFDF5; border: 1.5px solid #F6E05E; border-left: 5px solid #D69E2E; border-radius: 4px 8px 8px 4px; padding: 10px 14px; margin: 12px 0; font-size: 12.5px; color: #744210; line-height: 1.6; }}
+  .checkpoint-tag {{ font-weight: 800; color: #B7791F; background-color: #FEFCBF; padding: 2px 6px; border-radius: 4px; margin-right: 4px; font-size: 11.5px; }}
+  .tutor-add {{ color: #4A5568; font-size: 11.5px; margin-left: 4px; font-weight: normal; }}
 
   .analogy-box {{ background-color: #FDF2F8; border: 1.5px solid #FBCFE8; border-left: 5px solid #DB2777; border-radius: 4px 8px 8px 4px; padding: 10px 14px; margin: 12px 0; }}
   .analogy-header {{ font-weight: 800; font-size: 12px; color: #9D174D; margin-bottom: 2px; }}
