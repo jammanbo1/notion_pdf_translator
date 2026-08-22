@@ -135,27 +135,39 @@ def extract_and_design_multiple_files(file_list: list, subject_hint: str = "") -
 [필수 출력 양식 1단계: 지능형 제목 생성]
 답변의 첫 번째 줄에 반드시 아래 형식으로 문서의 핵심 내용을 포괄하는 정갈한 한국어 제목을 1개 출력하세요:
 DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
-(예: DOC_TITLE: 교류 정상상태 해석 및 2포트 회로망 마스터 리포트)
+(예: DOC_TITLE: 1계 상미분방정식(ODEs)의 모델링과 해법 마스터 리포트)
 
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-[학문적 도메인 자동 판별 및 맞춤형 서술 전략]
-Mode A. [물리 / 소자 / 자연과학 개념 중심 자료]
-- 핵심 집중: 물리적 메커니즘, 장(Field)/입자 시각화.
-- 필수 강조: 인라인 SVG 도식 2개 이상, 개념 대칭/비교 맵(<div class="concept-map">), #함정주의(오개념 교정).
+[핵심 서술 및 구조화 규칙]
+1. Mindset 액션 가이드 (<div class="mindset-box">):
+   - 문서 최상단에 해당 단원 문제를 접할 때 가장 먼저 의식해야 하는 핵심 행동 강령(Thinking Point)을 1줄로 명시할 것.
+   - 예: "미분방정식을 풀 때는 먼저 여함수(Complementary Function)와 입력의 형태를 대조해 해의 구조를 결정할 것."
 
-Mode B. [수학 / 회로 / 신호 / 계산 알고리즘 중심 자료]
-- 핵심 집중: 문제 풀이 알고리즘, 조건 판별 및 패턴화.
-- 필수 강조: 단계별 정석 예제 풀이(<div class="example-box">), #보이스피싱(<div class="voice-phishing-box">), Recall 선수 공식 박스.
+2. 3단계 솔루션 프로세스 (3-Step Solution Flow):
+   - 대표 예제 풀이(<div class="example-box">) 작성 시 다음 3단계 구조를 엄격히 준수할 것:
+     * [Step 1. 모델링/조건 분석]: 물리적/공학적 상황을 수학적 수식으로 정식화.
+     * [Step 2. 수학적 해법]: 중간 연산 과정을 생략 없이 정석대로 유도.
+     * [Step 3. 물리적 해석 및 검증]: 도출된 해의 물리적 의미, 유효 범위, 극한 거동 해석.
 
-[공통 필수 작성 규칙]
-1. 전단원 균형 커버리지: 첨부 파일에 등장하는 모든 핵심 소단원을 누락 없이 순서대로 균등하게 다룰 것.
-2. 표준 전공서 교차 검증: 표준 전공서의 엄밀한 수식 표기법(Notation)을 적용하고 원본의 오류를 교정할 것.
-3. 수식 표기: 모든 LaTeX 수식은 $...$(인라인) 또는 $$...$$(단독 블록)으로 명확히 닫을 것.
-4. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 통합 핵심 요약</div>
-5. 최하단 단원 공식 치트시트: <table class="cheat-sheet-table">로 핵심 공식, 적용 조건, 주의사항 정리.
-6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+3. 적용 한계 및 경계 조건 명시 (<div class="boundary-box">):
+   - 공식이나 해법이 성립하는 유효 범위와, 성립하지 않는 예외 조건(예: 1계 미방에서만 특이해가 존재하고 2계 선형에서는 존재하지 않는 이유 등)을 명확히 대조 서술할 것.
+
+4. 학문적 도메인 자동 판별 및 맞춤형 가중치:
+   - Mode A [물리 / 소자 / 자연과학 개념]:
+     * 물리적 메커니즘, 장(Field)/소자 시각화 인라인 SVG 도식 2개 이상 필수.
+     * 개념 대칭/비교 맵(<div class="concept-map">), #함정주의(<div class="trap-box">).
+   - Mode B [수학 / 회로 / 신호 / 계산 알고리즘]:
+     * 정석 예제 풀이, #보이스피싱(<div class="voice-phishing-box">) 숏컷, Recall 선수 공식 박스.
+
+5. 공통 완성도 규칙:
+   - 전단원 균형 커버리지: 누락 없이 순서대로 모든 핵심 소단원 포함.
+   - 표준 전공서 교차 검증: 엄밀한 수식 표기법과 부호 규약 적용.
+   - 수식 표기: 모든 LaTeX 수식은 $...$(인라인) 또는 $$...$$(단독 블록)으로 정확히 표기.
+   - 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 통합 요약</div>
+   - 최하단 치트시트: <table class="cheat-sheet-table">로 핵심 공식, 적용 조건, 주의사항 정리.
+   - 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
 """
     content_payload.append(prompt)
 
@@ -178,14 +190,12 @@ Mode B. [수학 / 회로 / 신호 / 계산 알고리즘 중심 자료]
             )
             raw_text = response.text
             
-            # DOC_TITLE 추출
             extracted_title = "전공_핵심_요약_리포트"
             body_html = raw_text
             
             match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
             if match:
                 extracted_title = match.group(1).strip()
-                # DOC_TITLE 줄을 본문에서 제거
                 body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
                 
             return extracted_title, body_html
@@ -226,11 +236,17 @@ def build_full_html(title: str, content_html: str) -> str:
   .doc-title {{ font-size: 22px; font-weight: 800; color: #1A365D; margin: 0 0 6px 0; }}
   .doc-subtitle {{ font-size: 12px; color: #718096; margin: 0; }}
   h2 {{ font-size: 16px; font-weight: 700; color: #2B6CB0; border-left: 4px solid #3182CE; padding-left: 8px; margin-top: 24px; }}
-  .highlight {{ background-color: #FEFCBF; padding: 2px 5px; border-radius: 4px; font-weight: 600; }}
+  
+  .mindset-box {{ background-color: #F0FFF4; border: 1.5px solid #9AE6B4; border-left: 5px solid #38A169; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin-bottom: 16px; }}
+  .mindset-header {{ font-weight: 800; font-size: 12.5px; color: #22543D; margin-bottom: 4px; }}
+  .mindset-desc {{ font-size: 12px; color: #276749; margin: 0; font-weight: 600; }}
+
   .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
   .formula-box {{ background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #4A5568; border-radius: 4px 8px 8px 4px; padding: 12px; margin: 12px 0; }}
-  .callout-box {{ background-color: #FFFDF5; border-left: 5px solid #D69E2E; padding: 12px 14px; margin: 12px 0; border-radius: 4px 8px 8px 4px; }}
   
+  .boundary-box {{ background-color: #F7FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #4A5568; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin: 14px 0; }}
+  .boundary-header {{ font-weight: 800; font-size: 12.5px; color: #2D3748; margin-bottom: 6px; }}
+
   .recall-box {{ background-color: #FFFAF0; border: 1.5px solid #FBD38D; border-left: 5px solid #DD6B20; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin: 14px 0; }}
   .recall-header {{ font-weight: 800; font-size: 12.5px; color: #C05621; margin-bottom: 6px; }}
   .recall-formula {{ background-color: #FFFFFF; border: 1px dashed #ED8936; border-radius: 4px; padding: 6px; margin: 6px 0; text-align: center; }}
@@ -246,8 +262,8 @@ def build_full_html(title: str, content_html: str) -> str:
   .example-header {{ font-weight: 800; font-size: 13px; color: #285E61; margin-bottom: 8px; }}
   .example-question {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 4px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; }}
   .example-solution {{ padding-left: 4px; font-size: 12px; }}
-  .solution-title {{ font-weight: 700; color: #2C7A7B; margin-bottom: 4px; }}
-  .calc-step {{ background-color: #FFFFFF; border: 1px solid #EDF2F7; border-radius: 4px; padding: 8px; margin: 6px 0 10px 0; text-align: center; }}
+  .step-label {{ font-weight: 700; color: #234E52; margin-top: 8px; margin-bottom: 2px; }}
+  .calc-step {{ background-color: #FFFFFF; border: 1px solid #EDF2F7; border-radius: 4px; padding: 8px; margin: 4px 0 8px 0; text-align: center; }}
 
   .voice-phishing-box {{ background-color: #FAF5FF; border: 1.5px solid #D6BCFA; border-left: 5px solid #805AD5; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 16px 0; }}
   .phishing-header {{ font-weight: 800; font-size: 13px; color: #6B46C1; margin-bottom: 6px; }}
@@ -300,7 +316,6 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
 
 
 def update_notion_success(page_id: str, download_url: str, custom_title: str):
-    # 이름(title 속성)과 정리본 링크를 함께 갱신
     update_data = {
         "정리본 링크": {"url": download_url},
         "이름": {"title": [{"text": {"content": custom_title}}]}
@@ -351,7 +366,6 @@ def main():
             print(f"분석 시작 (과목: {subject_hint}, 첨부파일 {len(files)}개)...")
 
             try:
-                # Gemini가 내용 기반으로 커스텀 제목과 본문 HTML을 반환
                 doc_title, body_html = extract_and_design_multiple_files(files, subject_hint)
                 
                 safe_title = sanitize_filename(doc_title)
@@ -365,7 +379,6 @@ def main():
                 pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{safe_title}.pdf")
                 print(f"  -> 다운로드 링크: {pdf_url}")
 
-                # 노션의 '이름' 컬럼과 '정리본 링크'를 동시 업데이트
                 update_notion_success(page_id, pdf_url, doc_title)
                 print("  -> Notion 업데이트 완료 (제목 & 링크 반영)!\n")
 
