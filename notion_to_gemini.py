@@ -135,7 +135,6 @@ def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", u
 [필수 출력 양식 1단계: 지능형 제목 생성]
 답변의 첫 번째 줄에 반드시 아래 형식으로 문서의 핵심 내용을 포괄하는 정갈한 한국어 제목을 1개 출력하세요:
 DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
-(예: DOC_TITLE: 1계 상미분방정식(ODEs)의 모델링과 해법 마스터 리포트)
 
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
@@ -143,14 +142,23 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [핵심 서술 및 구조화 규칙]
 1. Mindset 액션 가이드 (<div class="mindset-box">):
    - 문서 최상단에 해당 단원 문제를 접할 때 가장 먼저 의식해야 하는 핵심 행동 강령(Thinking Point)을 1줄로 명시할 것.
-2. 3단계 솔루션 프로세스 (3-Step Solution Flow):
+
+2. 한 줄 직관 비유 (<div class="analogy-box">):
+   - 추상적이거나 헷갈리는 핵심 개념에 대해 직관적으로 이해할 수 있는 "한 줄 비유"를 반드시 포함할 것.
+   - 예: Dirichlet 조건 = "경계면의 온도/높이를 고정하는 것", Neumann 조건 = "경계면을 통과하는 열 유속/경사도를 고정하는 것"
+   - 예: Divergence = "단위 부피당 샘(Source)에서 뿜어져 나오는 순 유출량", Curl = "물 위에 띄운 작은 바람개비가 돌아가는 회전도"
+
+3. 3단계 솔루션 프로세스 (3-Step Solution Flow):
    - 대표 예제 풀이(<div class="example-box">) 작성 시: [Step 1. 모델링/조건 분석] -> [Step 2. 수학적 해법] -> [Step 3. 물리적 해석 및 검증] 단계를 준수할 것.
-3. 적용 한계 및 경계 조건 명시 (<div class="boundary-box">):
+
+4. 적용 한계 및 경계 조건 명시 (<div class="boundary-box">):
    - 공식이나 해법이 성립하는 유효 범위와, 성립하지 않는 예외 조건을 명확히 대조 서술할 것.
-4. 학문적 도메인 자동 판별 및 맞춤형 가중치:
+
+5. 학문적 도메인 자동 판별 및 맞춤형 가중치:
    - Mode A [물리 / 소자 / 자연과학 개념]: 물리적 메커니즘, 장(Field)/소자 시각화 인라인 SVG 도식 2개 이상 필수, 개념 대칭/비교 맵(<div class="concept-map">), #함정주의(<div class="trap-box">).
    - Mode B [수학 / 회로 / 신호 / 계산 알고리즘]: 정석 예제 풀이, #보이스피싱(<div class="voice-phishing-box">) 숏컷, Recall 선수 공식 박스.
-5. 공통 완성도 규칙:
+
+6. 공통 완성도 규칙:
    - 전단원 균형 커버리지: 모든 핵심 소단원 누락 없이 포함.
    - 표준 전공서 교차 검증: 엄밀한 수식 표기법과 부호 규약 적용.
    - 수식 표기: 모든 LaTeX 수식은 $...$(인라인) 또는 $$...$$(단독 블록)으로 정확히 표기.
@@ -230,6 +238,10 @@ def build_full_html(title: str, content_html: str) -> str:
   .mindset-header {{ font-weight: 800; font-size: 12.5px; color: #22543D; margin-bottom: 4px; }}
   .mindset-desc {{ font-size: 12px; color: #276749; margin: 0; font-weight: 600; }}
 
+  .analogy-box {{ background-color: #FDF2F8; border: 1.5px solid #FBCFE8; border-left: 5px solid #DB2777; border-radius: 4px 8px 8px 4px; padding: 10px 14px; margin: 12px 0; }}
+  .analogy-header {{ font-weight: 800; font-size: 12px; color: #9D174D; margin-bottom: 2px; }}
+  .analogy-desc {{ font-size: 12px; color: #831843; margin: 0; font-weight: 600; line-height: 1.5; }}
+
   .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
   .formula-box {{ background-color: #F8FAFC; border: 1px solid #E2E8F0; border-left: 5px solid #4A5568; border-radius: 4px 8px 8px 4px; padding: 12px; margin: 12px 0; }}
   
@@ -305,7 +317,6 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
 
 
 def update_notion_success(page_id: str, download_url: str):
-    # 노션의 '이름' 속성은 건드리지 않고 '정리본 링크'와 '상태'만 업데이트
     update_data = {"정리본 링크": {"url": download_url}}
     try:
         update_data["상태"] = {"status": {"name": "완료"}}
@@ -338,13 +349,11 @@ def main():
             page_id = page["id"]
             props = page.get("properties", {})
 
-            # 과목 힌트 추출
             subject_hint = ""
             select_prop = props.get("선택", {})
             if select_prop.get("type") == "select" and select_prop.get("select"):
                 subject_hint = select_prop["select"].get("name", "")
 
-            # 노션에 원래 적혀 있는 단원명 힌트 추출 (Gemini 참조용)
             unit_hint = ""
             name_prop = props.get("이름", {})
             if name_prop.get("type") == "title" and name_prop.get("title"):
@@ -357,7 +366,6 @@ def main():
             print(f"분석 시작 (과목: '{subject_hint}', 단원명: '{unit_hint}', 첨부파일 {len(files)}개)...")
 
             try:
-                # Gemini가 내용 기반으로 생성한 리포트 전용 제목과 본문 HTML을 반환
                 doc_title, body_html = extract_and_design_multiple_files(files, subject_hint, unit_hint)
                 
                 safe_title = sanitize_filename(doc_title)
@@ -371,9 +379,8 @@ def main():
                 pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{safe_title}.pdf")
                 print(f"  -> 다운로드 링크: {pdf_url}")
 
-                # 노션의 단원명은 보존하고 정리본 링크와 완료 상태만 갱신
                 update_notion_success(page_id, pdf_url)
-                print("  -> Notion 업데이트 완료 (노션 단원명 보존, 링크 등록 완료)!\n")
+                print("  -> Notion 업데이트 완료 (단원명 보존, 링크 등록 완료)!\n")
 
                 time.sleep(5)
 
