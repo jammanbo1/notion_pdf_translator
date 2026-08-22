@@ -125,79 +125,37 @@ def find_supported_attachments(page):
     return supported_files
 
 
-def extract_and_design_multiple_files(file_list: list) -> str:
+def extract_and_design_multiple_files(file_list: list, subject_hint: str = "") -> tuple:
     content_payload = []
-    prompt = """
-당신은 최고의 시험 대비 튜터이자 전공 학업 요약 전문가입니다.
-첨부된 모든 문서/손글씨 필기 자료를 분석하여 이론, 표준 전공서 연계 개념, 실전 계산, 함정 방지, 요약 치트시트가 조화된 최고급 요약 리포트를 HTML 코드로 작성해주세요.
+    prompt = f"""
+당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 시험 대비 튜터입니다.
+첨부된 모든 전공 문서/필기 자료를 정밀 분석하여 최고급 요약 리포트를 작성해주세요.
+(참고 과목/분야 힌트: {subject_hint})
 
-[요약 범위 및 균형 구성 원칙 (필수 준수)]
-1. 전단원 균형 커버리지:
-   - 특정 1개 단원에 치우쳐 길게 서술하지 마세요.
-   - 첨부 파일에 등장하는 모든 대단원(예: AC 해석 및 전력, 상호 결합 회로, 라플라스 변환 회로, 능동/수동 필터, 푸리에 해석, 2포트 네트워크 등)을 누락 없이 순서대로 포함하세요.
-2. 각 단원별 균등 구조화:
-   - 각 대단원마다 [Recall(선수 개념) -> 핵심 개념/대칭 구조 -> 대표 계산 예제 1개 -> #보이스피싱 또는 #함정주의]가 골고루 배분되도록 작성하세요.
+[필수 출력 양식 1단계: 지능형 제목 생성]
+답변의 첫 번째 줄에 반드시 아래 형식으로 문서의 핵심 내용을 포괄하는 정갈한 한국어 제목을 1개 출력하세요:
+DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
+(예: DOC_TITLE: 교류 정상상태 해석 및 2포트 회로망 마스터 리포트)
 
-[엄격 수식 및 표준 전공 교재 연계 규칙]
-1. 표준 전공서(Alexander & Sadiku 회로이론, Griffiths 등) 내장 지식 교차 참조:
-   - 본 강의 자료/필기의 핵심 주제와 직접 매핑되는 표준 전공 교재의 정석 표기법(Notation), 논리적 증명 단계, 핵심 연습문제 패턴을 능동적으로 연계하여 필기에서 누락된 물리적 맥락을 자연스럽게 보강하세요.
-2. 원본 필기 오류 및 오개념 능동 검증 (Fact-Check):
-   - 원본 손글씨/문서에 오류(예: RMS vs Peak 전력 계수 1/2 누락, 변수 혼용 등)가 발견될 경우 올바른 수식으로 교정하여 반영하세요.
-   - 오개념 교정 사항은 #함정주의 박스에 명시하세요.
-3. 수식 정확도 및 물리 차원(Dimension) 검증:
-   - 모든 LaTeX 수식에서 상수와 기하 변수가 뒤바뀌거나 누락되지 않도록 검증하세요.
-   - 수식은 반드시 단독 블록($$...$$) 또는 인라인($...$)으로 명확히 닫아주세요.
+[2단계: 본문 HTML 작성]
+제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-[컴포넌트 HTML 가이드]
-- 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 대단원을 아우르는 3~4줄 핵심 요약</div>
-- 💡 Recall 박스:
-   <div class="recall-box">
-     <div class="recall-header">💡 Recall (선수 개념 & 리마인드)</div>
-     <p><strong>꼭 기억해야 할 배경 지식:</strong> 설명</p>
-     <div class="recall-formula">$$ 필수 수식/정리 $$</div>
-   </div>
-- 핵심 포인트: <div class="callout-box"><strong> Key Point:</strong> ... </div>
-- 개념 대칭 구조:
-   <div class="concept-map">
-     <div class="map-col"><div class="map-header">좌측 개념명</div><div class="map-formula">$$ 수식 $$</div><p class="map-desc">설명</p></div>
-     <div class="map-arrow">$$\\longleftrightarrow$$</div>
-     <div class="map-col"><div class="map-header">우측 개념명</div><div class="map-formula">$$ 수식 $$</div><p class="map-desc">설명</p></div>
-   </div>
-- 실전 적용 예제:
-   <div class="example-box">
-     <div class="example-header">📝 실전 적용 예제 (Example Problem)</div>
-     <div class="example-question"><strong>[문제]</strong> 문제 상황 및 조건</div>
-     <div class="example-solution">
-       <div class="solution-title"> 정석 풀이 및 계산 과정:</div>
-       <div class="calc-step">$$ 1단계: 수식 전개 $$</div>
-       <div class="calc-step">$$ \\therefore 최종 결과 $$</div>
-     </div>
-   </div>
-- 시험용 숏컷 (#보이스피싱):
-   <div class="voice-phishing-box">
-     <div class="phishing-header">⚡ #보이스피싱 (실전 초단축 풀이법)</div>
-     <div class="phishing-formula">$$ 단축 공식 $$</div>
-     <p class="phishing-desc">실전 적용 팁</p>
-   </div>
-- 시험 함정 주의 (#함정주의):
-   <div class="trap-box">
-     <div class="trap-header">⚠️ #함정주의 (자주 낚이는 오개념 & 실수 포인트)</div>
-     <p class="trap-desc">감점 방지 팁</p>
-   </div>
-- 시각화 다이어그램 (경량 인라인 SVG):
-   <div class="svg-container">
-     <svg viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg"><!-- 회로/도식 --></svg>
-     <div class="caption">도식 설명</div>
-   </div>
-- 최하단 단원 공식 치트시트:
-   <table class="cheat-sheet-table">
-     <thead><tr><th>공식/정리명</th><th>핵심 수식 (LaTeX)</th><th>적용 조건 및 핵심 주의사항</th></tr></thead>
-     <tbody>
-       <tr><td>항목명</td><td>$$ 수식 $$</td><td>조건 및 팁</td></tr>
-     </tbody>
-   </table>
+[학문적 도메인 자동 판별 및 맞춤형 서술 전략]
+Mode A. [물리 / 소자 / 자연과학 개념 중심 자료]
+- 핵심 집중: 물리적 메커니즘, 장(Field)/입자 시각화.
+- 필수 강조: 인라인 SVG 도식 2개 이상, 개념 대칭/비교 맵(<div class="concept-map">), #함정주의(오개념 교정).
 
-* 별도의 html, head, body 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
+Mode B. [수학 / 회로 / 신호 / 계산 알고리즘 중심 자료]
+- 핵심 집중: 문제 풀이 알고리즘, 조건 판별 및 패턴화.
+- 필수 강조: 단계별 정석 예제 풀이(<div class="example-box">), #보이스피싱(<div class="voice-phishing-box">), Recall 선수 공식 박스.
+
+[공통 필수 작성 규칙]
+1. 전단원 균형 커버리지: 첨부 파일에 등장하는 모든 핵심 소단원을 누락 없이 순서대로 균등하게 다룰 것.
+2. 표준 전공서 교차 검증: 표준 전공서의 엄밀한 수식 표기법(Notation)을 적용하고 원본의 오류를 교정할 것.
+3. 수식 표기: 모든 LaTeX 수식은 $...$(인라인) 또는 $$...$$(단독 블록)으로 명확히 닫을 것.
+4. 최상단 요약 박스: <div class="summary-box"><strong> 핵심 요약</strong>: 전체 자료의 통합 핵심 요약</div>
+5. 최하단 단원 공식 치트시트: <table class="cheat-sheet-table">로 핵심 공식, 적용 조건, 주의사항 정리.
+6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환하세요.
 """
     content_payload.append(prompt)
 
@@ -218,7 +176,20 @@ def extract_and_design_multiple_files(file_list: list) -> str:
             response = model.generate_content(
                 content_payload, request_options={"timeout": 300}
             )
-            return response.text
+            raw_text = response.text
+            
+            # DOC_TITLE 추출
+            extracted_title = "전공_핵심_요약_리포트"
+            body_html = raw_text
+            
+            match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
+            if match:
+                extracted_title = match.group(1).strip()
+                # DOC_TITLE 줄을 본문에서 제거
+                body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
+                
+            return extracted_title, body_html
+
         except Exception as e:
             if "429" in str(e) and attempt < 2:
                 print("  [알림] API 호출 제한 감지. 45초 후 자동 재시도합니다...")
@@ -328,8 +299,12 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser.close()
 
 
-def update_notion_success(page_id: str, download_url: str):
-    update_data = {"정리본 링크": {"url": download_url}}
+def update_notion_success(page_id: str, download_url: str, custom_title: str):
+    # 이름(title 속성)과 정리본 링크를 함께 갱신
+    update_data = {
+        "정리본 링크": {"url": download_url},
+        "이름": {"title": [{"text": {"content": custom_title}}]}
+    }
     try:
         update_data["상태"] = {"status": {"name": "완료"}}
         notion.pages.update(page_id=page_id, properties=update_data)
@@ -339,8 +314,16 @@ def update_notion_success(page_id: str, download_url: str):
             notion.pages.update(page_id=page_id, properties=update_data)
         except Exception:
             notion.pages.update(
-                page_id=page_id, properties={"정리본 링크": {"url": download_url}}
+                page_id=page_id,
+                properties={
+                    "정리본 링크": {"url": download_url},
+                    "이름": {"title": [{"text": {"content": custom_title}}]}
+                }
             )
+
+
+def sanitize_filename(filename: str) -> str:
+    return re.sub(r'[\\/*?:"<>|]', "", filename).strip().replace(" ", "_")
 
 
 def main():
@@ -354,34 +337,37 @@ def main():
     with tempfile.TemporaryDirectory() as temp_dir:
         for page in items:
             page_id = page["id"]
+            props = page.get("properties", {})
+
+            subject_hint = ""
+            select_prop = props.get("선택", {})
+            if select_prop.get("type") == "select" and select_prop.get("select"):
+                subject_hint = select_prop["select"].get("name", "")
+
             files = find_supported_attachments(page)
             if not files:
                 continue
 
-            main_title = os.path.splitext(files[0]["name"])[0]
-            if len(files) > 1:
-                main_title = f"{main_title}_외_{len(files)-1}건_통합본"
-
-            print(
-                f"'{main_title}' (총 {len(files)}개 파일) 종합 분석 및 디자인"
-                " PDF 생성 중..."
-            )
+            print(f"분석 시작 (과목: {subject_hint}, 첨부파일 {len(files)}개)...")
 
             try:
-                body_html = extract_and_design_multiple_files(files)
-                full_html = build_full_html(main_title, body_html)
+                # Gemini가 내용 기반으로 커스텀 제목과 본문 HTML을 반환
+                doc_title, body_html = extract_and_design_multiple_files(files, subject_hint)
+                
+                safe_title = sanitize_filename(doc_title)
+                print(f"  -> 생성된 리포트 제목: {doc_title}")
 
-                temp_pdf_path = os.path.join(temp_dir, f"{main_title}_정리본.pdf")
+                full_html = build_full_html(doc_title, body_html)
+                temp_pdf_path = os.path.join(temp_dir, f"{safe_title}.pdf")
                 render_html_to_pdf(full_html, temp_pdf_path)
 
-                print("  -> GitHub Storage에 통합본 업로드 중...")
-                pdf_url = upload_pdf_to_github_release(
-                    temp_pdf_path, f"{main_title}_정리본.pdf"
-                )
-                print(f"  -> 다운로드 링크 생성 완료: {pdf_url}")
+                print("  -> GitHub Storage에 업로드 중...")
+                pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{safe_title}.pdf")
+                print(f"  -> 다운로드 링크: {pdf_url}")
 
-                update_notion_success(page_id, pdf_url)
-                print("  -> Notion 업데이트 완료!\n")
+                # 노션의 '이름' 컬럼과 '정리본 링크'를 동시 업데이트
+                update_notion_success(page_id, pdf_url, doc_title)
+                print("  -> Notion 업데이트 완료 (제목 & 링크 반영)!\n")
 
                 time.sleep(5)
 
