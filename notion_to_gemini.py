@@ -19,7 +19,7 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-3.5-flash")
 
 
 def get_or_create_release(tag="pdf-reports"):
