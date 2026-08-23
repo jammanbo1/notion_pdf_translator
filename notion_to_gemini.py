@@ -19,7 +19,13 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-3.6-flash")
+
+# 우선순위별 모델 폴백 리스트 (1순위 -> 2순위 -> 3순위)
+FALLBACK_MODELS = [
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite"
+]
 
 
 def get_or_create_release(tag="pdf-reports"):
@@ -182,10 +188,14 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
             )
         content_payload.append({"mime_type": mime_type, "data": res.content})
 
-    for attempt in range(3):
+    # 모델 폴백 루프 (3.5 Flash -> 3.6 Flash -> 3.5 Flash Lite)
+    last_exception = None
+    for model_name in FALLBACK_MODELS:
+        print(f"  -> [{model_name}] 모델로 분석 및 렌더링 시도 중...")
         try:
-            response = model.generate_content(
-                content_payload, request_options={"timeout": 300}
+            current_model = genai.GenerativeModel(model_name)
+            response = current_model.generate_content(
+                content_payload, request_options={"timeout": 600}
             )
             raw_text = response.text
             
@@ -197,14 +207,22 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
                 extracted_title = match.group(1).strip()
                 body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
                 
+            print(f"  -> [{model_name}] 생성 성공!")
             return extracted_title, body_html
 
         except Exception as e:
-            if "429" in str(e) and attempt < 2:
-                print("  [알림] API 호출 제한 감지. 45초 후 자동 재시도합니다...")
-                time.sleep(45)
+            last_exception = e
+            err_msg = str(e)
+            print(f"  [경고] {model_name} 실패 (사유: {err_msg})")
+            if "429" in err_msg or "ResourceExhausted" in err_msg or "504" in err_msg or "Deadline" in err_msg:
+                print("  -> 할당량 소진 또는 타임아웃 감지. 다음 순위 모델로 자동 전환합니다...")
+                time.sleep(3)
+                continue
             else:
-                raise e
+                print("  -> 다음 순위 모델로 즉시 전환 시도...")
+                continue
+
+    raise RuntimeError(f"모든 후보 모델 호출 실패: {last_exception}")
 
 
 def build_full_html(title: str, content_html: str) -> str:
@@ -307,7 +325,7 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(800)
         page.pdf(
             path=output_pdf_path,
             format="A4",
@@ -386,12 +404,12 @@ def main():
                 print(f"  -> 다운로드 링크: {pdf_url}")
 
                 update_notion_success(page_id, pdf_url)
-                print("  -> Notion 업데이트 완료 (단원명 보존, 링크 등록 완료)!\n")
+                print("  -> Notion 업데이트 완료 (링크 등록 완료)!\n")
 
-                time.sleep(5)
+                time.sleep(1)
 
             except Exception as e:
-                print(f"  -> 실패: {e}\n")
+                print(f"  -> 최종 실패: {e}\n")
 
 
 if __name__ == "__main__":
