@@ -134,7 +134,7 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
-    # --- 프롬프트 내부의 벡터 작도 규칙만 볼드 이탤릭으로 수정 ---
+    # --- 프롬프트 수정: 한자 사용 절대 금지 규칙 추가 및 SVG 작도 규칙 제거 ---
     prompt_text = f"""당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 편집자입니다.
 첨부된 자료를 정밀 분석하여, 지정된 4대 컬러 체계(빨간색/파란색/초록색/보라색)로 완벽히 통일된 최고급 A4 요약 리포트를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
@@ -145,6 +145,9 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
+
+★ [본문 텍스트 절대 규칙: 한자 사용 금지]
+본문의 모든 설명 텍스트, 제목, 뱃지, 노트 박스 내부 등 답변 전체에서 한자(漢字)를 절대로 사용하지 마세요. 모든 한자 용어는 한글 전용 표기로 바꾸거나 쉬운 한글 표현으로 수정하여 작성해야 합니다. (예: 핵심恒等式 -> 핵심 항등식, 誘導 -> 유도)
 
 ★ [4대 전용 컬러 배정 및 마크업 통일 절대 규칙]
 본문의 모든 박스와 뱃지는 반드시 아래 지정된 4가지 클래스만 사용하세요:
@@ -178,18 +181,9 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 1. PDF 본문 HTML/LaTeX 수식: 뭉개짐 방지를 위해 **상단 확장 화살표(\\vec{{...}} 또는 \\overrightarrow{{...}})**를 사용할 것!
    - 예: \\vec{{F}}, \\vec{{r}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{v}}
    - 단위 벡터: \\hat{{n}}, \\hat{{r}}, \\hat{{i}}, \\hat{{j}}, \\hat{{k}}
-2. **SVG 도판 내부 수식/라벨**: 화살표 오버레이 대신 **글로벌 대학 교재 표준 볼드 이탤릭체(Bold Italic)**로 작성할 것!
-   - 벡터량: <tspan font-style="italic" font-weight="bold">F</tspan>, <tspan font-style="italic" font-weight="bold">r</tspan>, <tspan font-style="italic" font-weight="bold">E</tspan>
-   - 단위 벡터: 햇 기호를 얹은 볼드 이탤릭 (<tspan font-style="italic" font-weight="bold">n̂</tspan>, <tspan font-style="italic" font-weight="bold">r̂</tspan>)
-   - 스칼라/좌표: 이탤릭 (<tspan font-style="italic">x</tspan>, <tspan font-style="italic">y</tspan>, <tspan font-style="italic">z</tspan>)
-
-★ [전공 표준 교재 스타일 도판 SVG 작도 규칙 (최소 3~4개 필수)]
-- 해당 단원과 관련된 물리적/수학적 핵심 상황만 정밀 작도할 것.
-- **수학적 엄밀성**: 임의의 곡선 추정 금지. 수학적 수치 샘플링 및 **$C^1$ 연속 스무딩**을 적용한 매끄러운 닫힌 곡선(path) 생성. 점근선, 극대/극소, 좌표 틱 정확히 일치.
-- **모노크롬 테마**: 깔끔한 흑백 출판 스타일(`#0f172a`, `#f8fafc`, 점선 `#94a3b8`).
 
 ★ [시험 대비 종합 치트시트 테이블]
-최하단에 <table class="cheat-sheet-table">로 핵심 공식 및 정리를 성질별로 집대성 요약 정리.
+최하단에 <table class="cheat-sheet-table">로 핵심 공식 및 정리를 성질별로 집대성 요약 정리. (이 부분 역시 한자 사용 절대 금지)
 """
     content_payload.append(prompt_text)
 
@@ -339,7 +333,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
   .note-purple {{ border-left: 4px solid #7C3AED; background-color: #FAF5FF0D; }}
 
-  /* SVG 다이어그램 컨테이너 */
+  /* SVG 다이어그램 컨테이너 - 그래프 제거로 사용 빈도 낮지만 스타일 유지 */
   .svg-container {{ 
     text-align: center; 
     margin: 20px 0; 
@@ -503,6 +497,7 @@ def main():
             print(f"분석 시작 (과목: '{subject_hint}', 단원명: '{unit_hint}', 첨부파일 {len(files)}개)...")
 
             try:
+                # 제미나이가 그래프를 그리는 SVG 작도 부분을 제외하고 텍스트로만 요약하도록 프롬프트가 수정됨
                 doc_title, body_html = extract_and_design_multiple_files(files, subject_hint, unit_hint)
                 
                 safe_title = sanitize_filename(doc_title)
