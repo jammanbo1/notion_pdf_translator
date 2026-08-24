@@ -20,7 +20,6 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 우선순위별 모델 폴백 리스트
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
@@ -134,8 +133,8 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
-    prompt_text = """당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 삽화가입니다.
-첨부된 자료를 정밀 분석하여, 표준 전공 교재(Stewart Calculus 9th, Griffiths Electrodynamics, Feynman Lectures)의 Figure와 100% 일치하는 엄밀한 SVG 다이어그램 및 학습 점검용 실전 예제가 포함된 A4 요약 리포트를 작성해주세요.
+    prompt_text = """당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재(Griffiths, Stewart, Feynman)의 공식 그래픽 튜터입니다.
+첨부된 자료를 정밀 분석하여, 교재급 고화질 도판과 학습 점검용 실전 예제가 포함된 최고급 A4 요약 리포트를 작성해주세요.
 (참고 과목: """ + subject_hint + """, 단원명: """ + unit_hint + """)
 
 [필수 출력 양식 1단계: 제목 생성]
@@ -145,29 +144,37 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [매우 중요: 벡터 기호 상단 화살표 표기 절대 규칙]
-1. 모든 벡터는 굵은 볼드체(\\mathbf)를 절대 쓰지 말고, 해당 문자 바로 위에 화살표(\\vec{...})를 그려서 표기할 것!
-   - 예: \\vec{v}, \\vec{E}, \\vec{B}, \\vec{A}, \\vec{F}, \\vec{r}, \\vec{h}, \\vec{\\nabla}
-2. 미소 벡터 변위 및 면적 요소:
-   - d 전체가 아닌 문자 위에만 화살표를 표기할 것: d\\vec{l}, d\\vec{r}, d\\vec{s}, d\\vec{a} = \\hat{n} da, d\\vec{S} = \\hat{n} dS
-   - 예: \\int_C \\vec{F} \\cdot d\\vec{r}, \\quad \\oint \\vec{B} \\cdot d\\vec{l}, \\quad \\iint_S \\vec{E} \\cdot d\\vec{a}
-3. 단위 벡터(Unit Vector)는 윗꺽쇠(\\hat{...})로 통일:
-   - \\hat{n}, \\hat{r}, \\hat{x}, \\hat{y}, \\hat{z}, \\hat{\\theta}, \\hat{\\phi}
+★ [매우 중요: SVG 내부 수식 라벨 깨짐 방지 절대 규칙]
+1. SVG 내부에서 수식이나 벡터 기호(예: $\\vec{E}$, $\\hat{n}$, $\\vec{r}$, $\\frac{\\sigma^2}{2\\epsilon_0}$)를 표기할 때는 절대 일반 <text> 태그에 원시 코드를 넣지 마세요!
+2. 반드시 KaTeX가 렌더링할 수 있도록 <foreignObject> 태그로 감싸서 HTML 수식($...$)으로 작성하세요:
+   예시:
+   <foreignObject x="320" y="80" width="180" height="40">
+     <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:12px; color:#C53030; font-family:'Pretendard', sans-serif;">
+       $\\vec{E}_{\\perp,\\text{out}}$
+     </div>
+   </foreignObject>
+3. 순수 영문 일반 텍스트(예: Conductor, Cavity, Hot, Cold)만 <text x="..." y="...">Conductor</text> 형태로 사용하세요.
 
-[핵심 규칙 1: 전공 표준 교재 Figure(도판) 1:1 완벽 정밀 복원]
-절대로 개념과 무관한 임의의 그림이나 장식용 다이어그램을 그리지 마세요.
-수학/물리/생물 개념이 등장할 경우, 반드시 표준 교재의 정식 Figure 구조를 SVG(<div class="svg-container"><svg viewBox="0 0 600 350" ...>...</svg><p class="caption">Fig. [교재식 번호 및 설명]</p></div>)로 최소 3~5개 이상 작도하세요:
-- Stewart Calculus 규격: 3차원 오른손 좌표계, 등위곡선군 및 수직 그레이디언트 벡터장, 곡면 적분/스토크스 정리 정사영 D.
-- Griffiths/Feynman 규격: 가우스 폐곡면 유선과 법선 분해 성분, 와도 및 폐루프 순환(Circulation), 분리 벡터 삼각도.
-- 생명/공학 규격: 원형 플라스미드 맵, Blotting 적층 장치도, 유전체 지도 축 비교도, 메모리 맵.
+★ [매우 중요: 기하학적 벡터 도식 작도 엄밀성 규칙]
+1. Griffiths Fig 2.8 연속 전하 분리 벡터 도식 작도 시:
+   - 세 벡터는 절대 일직선상에 겹쳐 그리지 말고, 명확한 삼각형(Triangle) 형태를 유지할 것!
+   - 원점 $O(80, 260)$에서 소스 전하 $dq'$ 위치(200, 190)로 향하는 위치 벡터 $\\vec{r}'$
+   - 원점 $O(80, 260)$에서 관측점 $P$(450, 80)로 향하는 위치 벡터 $\\vec{r}$
+   - 소스 전하(200, 190)에서 관측점 $P$(450, 80)로 직접 연결되는 분리 벡터 $\\vec{\\eta} = \\vec{r} - \\vec{r}'$ (삼각형의 세 번째 변)
+   - 관측점 $P$에서 분리 벡터 방향으로 연장되어 뻗어나가는 미소 전기장 벡터 $d\\vec{E}$
+2. Pillbox(가우스 원통) 및 경계 조건 도식:
+   - 가우스 원통의 상단면 외향 법선 $\\hat{n}$, 상부 전기장 $\\vec{E}_{\\perp,\\text{out}}$, 하부 전기장 $\\vec{E}_{\\perp,\\text{in}}$을 겹치지 않게 여백을 두고 배치.
+3. 균일 구체 전하 전기장/전위 그래프:
+   - $r < R$ (내부): 선형 증가 $E \\propto r$ (실선), $r > R$ (외부): 역제곱 감소 $E \\propto 1/r^2$ (실선).
+   - 전위 $\\Phi$: $r < R$ 포물선 완만 감소, $r > R$ $1/r$ 감소 곡선(점선).
 
-[핵심 규칙 2: 최종 학습 점검용 실전 연습 예제 (Practice Problems) 필수 수록]
+[핵심 규칙 2: 최종 학습 점검용 실전 연습 예제 (Practice Problems) 수록]
 본문 마지막 부분(치트시트 직전 또는 직후)에 해당 단원의 핵심 개념을 종합 평가할 수 있는 대표 고난도 실전 예제 1~2개를 반드시 아래 구조로 수록하세요:
 
 <div class="practice-box">
   <div class="practice-header">🎯 [학습 점검] 핵심 개념 실전 적용 예제</div>
   <div class="practice-question">
-    <strong>[문제]</strong> (실제 대학 중간/기말고사 또는 전공 자격시험 스타일의 정밀한 문제 상황 제시)
+    <strong>[문제]</strong> (실제 대학 중간/기말고사 기출 스타일의 정밀한 문제 상황 제시)
   </div>
   <div class="practice-solution">
     <div class="step-label">Step 1. 문제 분석 및 핵심 조건/공식 수립</div>
@@ -183,10 +190,9 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 1. Mindset 액션 가이드 (<div class="mindset-box">)
 2. 한 줄 직관 비유 (<div class="analogy-box">)
 3. 샤프/연필 필기 체크포인트 (<div class="checkpoint-box"><span class="checkpoint-tag">#체크포인트</span> 원문 메모 <span class="tutor-add">(튜터 첨언: ...)</span></div>)
-4. 수식 표기: 모든 수식은 엄밀한 LaTeX $...$ 및 $$...$$ 사용. (벡터는 무조건 \\vec{...})
-5. 최종 학습 점검 실전 예제 (<div class="practice-box">)
-6. 시험 대비 치트시트 테이블 (<table class="cheat-sheet-table">)
-7. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
+4. 수식 표기: 모든 수식은 엄밀한 LaTeX $...$ 및 $$...$$ 사용. (벡터는 무조건 \\vec{...} 및 d\\vec{l}, d\\vec{r}, d\\vec{a}, d\\vec{S})
+5. 시험 대비 치트시트 테이블 (<table class="cheat-sheet-table">) 최하단 배치.
+6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
 """
     content_payload.append(prompt_text)
 
@@ -204,7 +210,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  -> [{model_name}] 모델로 분석, 도판 SVG 및 실전 점검 예제 렌더링 시도 중...")
+        print(f"  -> [{model_name}] 모델로 분석 및 SVG 수식(<foreignObject>) 렌더링 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -277,7 +283,7 @@ def build_full_html(title: str, content_html: str) -> str:
 
   .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
   
-  .svg-container {{ text-align: center; margin: 18px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
+  .svg-container {{ text-align: center; margin: 18px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }}
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
   .caption {{ font-size: 11.5px; color: #4A5568; font-weight: 600; margin-top: 8px; text-align: center; }}
 
@@ -317,7 +323,7 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(1000)
         page.pdf(
             path=output_pdf_path,
             format="A4",
