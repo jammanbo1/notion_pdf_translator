@@ -1,10 +1,10 @@
-name: Notion PDF Translator
+name: Notion Text Summary
 
 on:
   schedule:
-    # 1시간마다 자동 실행 (매시 0분 UTC)
-    - cron: '0 * * * *'
-  workflow_dispatch: # 필요할 때 언제든 수동 실행 버튼도 유지
+    # 2시간마다 자동 실행 (짝수시 정각 UTC 기준)
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # 수동 실행 버튼
 
 jobs:
   build:
@@ -24,7 +24,7 @@ jobs:
           pip install notion-client google-generativeai playwright requests python-dotenv
           playwright install --with-deps chromium
 
-      - name: Run Script
+      - name: Run Text Summary Script
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DB_ID: ${{ secrets.NOTION_DB_ID }}
