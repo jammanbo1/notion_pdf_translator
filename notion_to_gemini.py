@@ -1,13 +1,13 @@
+import mimetypes
 import os
 import re
-import time
-import mimetypes
 import tempfile
-import requests
+import time
+import google.generativeai as genai
 from dotenv import load_dotenv
 from notion_client import Client
-import google.generativeai as genai
 from playwright.sync_api import sync_playwright
+import requests
 
 load_dotenv()
 
@@ -20,6 +20,7 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
+# --- 이전 코드의 모델 설정을 그대로 유지 ---
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
@@ -133,9 +134,10 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
-    prompt_text = """당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재(Griffiths, Stewart, Feynman)의 공식 그래픽 튜터입니다.
-첨부된 자료를 정밀 분석하여, 교재급 고화질 도판과 학습 점검용 실전 예제가 포함된 최고급 A4 요약 리포트를 작성해주세요.
-(참고 과목: """ + subject_hint + """, 단원명: """ + unit_hint + """)
+    # --- 프롬프트 내부의 벡터 작도 규칙만 볼드 이탤릭으로 수정 ---
+    prompt_text = f"""당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 편집자입니다.
+첨부된 자료를 정밀 분석하여, 지정된 4대 컬러 체계(빨간색/파란색/초록색/보라색)로 완벽히 통일된 최고급 A4 요약 리포트를 작성해주세요.
+(참고 과목: {subject_hint}, 단원명: {unit_hint})
 
 [필수 출력 양식 1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
@@ -144,58 +146,54 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [매우 중요: SVG 내부 수식 라벨 깨짐 방지 절대 규칙]
-1. SVG 내부에서 수식이나 벡터 기호(예: $\\vec{E}$, $\\hat{n}$, $\\vec{r}$, $\\frac{\\sigma^2}{2\\epsilon_0}$)를 표기할 때는 절대 일반 <text> 태그에 원시 코드를 넣지 마세요!
-2. 반드시 KaTeX가 렌더링할 수 있도록 <foreignObject> 태그로 감싸서 HTML 수식($...$)으로 작성하세요:
-   예시:
-   <foreignObject x="320" y="80" width="180" height="40">
-     <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:12px; color:#C53030; font-family:'Pretendard', sans-serif;">
-       $\\vec{E}_{\\perp,\\text{out}}$
+★ [4대 전용 컬러 배정 및 마크업 통일 절대 규칙]
+본문의 모든 박스와 뱃지는 반드시 아래 지정된 4가지 클래스만 사용하세요:
+
+1. 빨간색 (Red) -> [중요], [체크포인트], 핵심 공식/유도:
+   - <div class="note-box note-red"><span class="badge badge-red">중요</span> ...</div>
+   - <div class="note-box note-red"><span class="badge badge-red">핵심 공식 유도</span> ...</div>
+
+2. 파란색 (Blue) -> [핵심 개념], [학습 목표]:
+   - <div class="note-box note-blue"><span class="badge badge-blue">학습 목표</span> ...</div>
+   - <div class="note-box note-blue"><span class="badge badge-blue">핵심 개념</span> ...</div>
+
+3. 초록색 (Green) -> [직관 비유], [해석 팁]:
+   - <div class="note-box note-green"><span class="badge badge-green">직관 비유</span> ...</div>
+
+4. 보라색 (Purple) -> [학습 점검], [실전 예제]:
+   <div class="practice-box">
+     <div class="practice-header"><span class="badge badge-purple">학습 점검</span> 실전 기출/적용 예제</div>
+     <div class="practice-question"><strong>[문제]</strong> (상황 제시 및 질문)</div>
+     <div class="practice-solution">
+       <div class="step-label">Step 1. 문제 모델링 및 핵심 공식 수립</div>
+       <p>...</p>
+       <div class="step-label">Step 2. 수식 전개 과정</div>
+       <div class="calc-step">$$ ... $$</div>
+       <div class="step-label">Step 3. 결과 해석 및 함정 방어</div>
+       <p>...</p>
      </div>
-   </foreignObject>
-3. 순수 영문 일반 텍스트(예: Conductor, Cavity, Hot, Cold)만 <text x="..." y="...">Conductor</text> 형태로 사용하세요.
+   </div>
 
-★ [매우 중요: 기하학적 벡터 도식 작도 엄밀성 규칙]
-1. Griffiths Fig 2.8 연속 전하 분리 벡터 도식 작도 시:
-   - 세 벡터는 절대 일직선상에 겹쳐 그리지 말고, 명확한 삼각형(Triangle) 형태를 유지할 것!
-   - 원점 $O(80, 260)$에서 소스 전하 $dq'$ 위치(200, 190)로 향하는 위치 벡터 $\\vec{r}'$
-   - 원점 $O(80, 260)$에서 관측점 $P$(450, 80)로 향하는 위치 벡터 $\\vec{r}$
-   - 소스 전하(200, 190)에서 관측점 $P$(450, 80)로 직접 연결되는 분리 벡터 $\\vec{\\eta} = \\vec{r} - \\vec{r}'$ (삼각형의 세 번째 변)
-   - 관측점 $P$에서 분리 벡터 방향으로 연장되어 뻗어나가는 미소 전기장 벡터 $d\\vec{E}$
-2. Pillbox(가우스 원통) 및 경계 조건 도식:
-   - 가우스 원통의 상단면 외향 법선 $\\hat{n}$, 상부 전기장 $\\vec{E}_{\\perp,\\text{out}}$, 하부 전기장 $\\vec{E}_{\\perp,\\text{in}}$을 겹치지 않게 여백을 두고 배치.
-3. 균일 구체 전하 전기장/전위 그래프:
-   - $r < R$ (내부): 선형 증가 $E \\propto r$ (실선), $r > R$ (외부): 역제곱 감소 $E \\propto 1/r^2$ (실선).
-   - 전위 $\\Phi$: $r < R$ 포물선 완만 감소, $r > R$ $1/r$ 감소 곡선(점선).
+★ [벡터 및 수식 표기 절대 통일 규칙]
+1. PDF 본문 HTML/LaTeX 수식: 뭉개짐 방지를 위해 **상단 확장 화살표(\\vec{{...}} 또는 \\overrightarrow{{...}})**를 사용할 것!
+   - 예: \\vec{{F}}, \\vec{{r}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{v}}
+   - 단위 벡터: \\hat{{n}}, \\hat{{r}}, \\hat{{i}}, \\hat{{j}}, \\hat{{k}}
+2. **SVG 도판 내부 수식/라벨**: 화살표 오버레이 대신 **글로벌 대학 교재 표준 볼드 이탤릭체(Bold Italic)**로 작성할 것!
+   - 벡터량: <tspan font-style="italic" font-weight="bold">F</tspan>, <tspan font-style="italic" font-weight="bold">r</tspan>, <tspan font-style="italic" font-weight="bold">E</tspan>
+   - 단위 벡터: 햇 기호를 얹은 볼드 이탤릭 (<tspan font-style="italic" font-weight="bold">n̂</tspan>, <tspan font-style="italic" font-weight="bold">r̂</tspan>)
+   - 스칼라/좌표: 이탤릭 (<tspan font-style="italic">x</tspan>, <tspan font-style="italic">y</tspan>, <tspan font-style="italic">z</tspan>)
 
-[핵심 규칙 2: 최종 학습 점검용 실전 연습 예제 (Practice Problems) 수록]
-본문 마지막 부분(치트시트 직전 또는 직후)에 해당 단원의 핵심 개념을 종합 평가할 수 있는 대표 고난도 실전 예제 1~2개를 반드시 아래 구조로 수록하세요:
+★ [전공 표준 교재 스타일 도판 SVG 작도 규칙 (최소 3~4개 필수)]
+- 해당 단원과 관련된 물리적/수학적 핵심 상황만 정밀 작도할 것.
+- **수학적 엄밀성**: 임의의 곡선 추정 금지. 수학적 수치 샘플링 및 **$C^1$ 연속 스무딩**을 적용한 매끄러운 닫힌 곡선(path) 생성. 점근선, 극대/극소, 좌표 틱 정확히 일치.
+- **모노크롬 테마**: 깔끔한 흑백 출판 스타일(`#0f172a`, `#f8fafc`, 점선 `#94a3b8`).
 
-<div class="practice-box">
-  <div class="practice-header">🎯 [학습 점검] 핵심 개념 실전 적용 예제</div>
-  <div class="practice-question">
-    <strong>[문제]</strong> (실제 대학 중간/기말고사 기출 스타일의 정밀한 문제 상황 제시)
-  </div>
-  <div class="practice-solution">
-    <div class="step-label">Step 1. 문제 분석 및 핵심 조건/공식 수립</div>
-    <p>...</p>
-    <div class="step-label">Step 2. 수식 전개 및 단계별 풀이 과정</div>
-    <div class="calc-step">$$ ... $$</div>
-    <div class="step-label">Step 3. 물리적/학문적 의미 해석 및 오답 함정 방어</div>
-    <p>...</p>
-  </div>
-</div>
-
-[본문 구성 및 마크업 규칙]
-1. Mindset 액션 가이드 (<div class="mindset-box">)
-2. 한 줄 직관 비유 (<div class="analogy-box">)
-3. 샤프/연필 필기 체크포인트 (<div class="checkpoint-box"><span class="checkpoint-tag">#체크포인트</span> 원문 메모 <span class="tutor-add">(튜터 첨언: ...)</span></div>)
-4. 수식 표기: 모든 수식은 엄밀한 LaTeX $...$ 및 $$...$$ 사용. (벡터는 무조건 \\vec{...} 및 d\\vec{l}, d\\vec{r}, d\\vec{a}, d\\vec{S})
-5. 시험 대비 치트시트 테이블 (<table class="cheat-sheet-table">) 최하단 배치.
-6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
+★ [시험 대비 종합 치트시트 테이블]
+최하단에 <table class="cheat-sheet-table">로 핵심 공식 및 정리를 성질별로 집대성 요약 정리.
 """
     content_payload.append(prompt_text)
 
+    # --- 이전 코드의 requests 사용 방식을 유지 ---
     for item in file_list:
         res = requests.get(item["url"], stream=True, timeout=120)
         res.raise_for_status()
@@ -210,7 +208,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  -> [{model_name}] 모델로 분석 및 SVG 수식(<foreignObject>) 렌더링 시도 중...")
+        print(f"  -> [{model_name}] 모델로 분석 및 리포트 렌더링 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -244,6 +242,7 @@ def build_full_html(title: str, content_html: str) -> str:
         r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE
     )
 
+    # --- KaTeX 설정에 화살표 매크로 설정을 보완하여 유지 ---
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -257,54 +256,170 @@ def build_full_html(title: str, content_html: str) -> str:
                 {{left: '$$', right: '$$', display: true}},
                 {{left: '$', right: '$', display: false}}
             ],
+            macros: {{
+                '\\\\vec': '\\\\overrightarrow',
+                '\\\\oiint': '\\\\oint\\\\mkern-13mu\\\\oint'
+            }},
             throwOnError: false
         }});"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
   @page {{ size: A4; margin: 18mm 14mm; }}
-  body {{ font-family: 'Pretendard', sans-serif; color: #2D3748; line-height: 1.7; font-size: 13px; margin: 0; }}
-  .header-container {{ border-bottom: 2px solid #2B6CB0; padding-bottom: 12px; margin-bottom: 20px; }}
-  .doc-title {{ font-size: 21px; font-weight: 800; color: #1A365D; margin: 0 0 6px 0; }}
-  .doc-subtitle {{ font-size: 12px; color: #718096; margin: 0; }}
-  h2 {{ font-size: 16px; font-weight: 700; color: #2B6CB0; border-left: 4px solid #3182CE; padding-left: 8px; margin-top: 24px; }}
-  h3 {{ font-size: 14px; font-weight: 700; color: #2D3748; margin-top: 16px; }}
+  body {{ 
+    font-family: 'Pretendard', sans-serif; 
+    color: #1E293B; 
+    line-height: 1.75; 
+    font-size: 13px; 
+    margin: 0; 
+    background-color: #FFFFFF;
+  }}
   
-  .mindset-box {{ background-color: #F0FFF4; border: 1.5px solid #9AE6B4; border-left: 5px solid #38A169; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin-bottom: 16px; }}
-  .mindset-header {{ font-weight: 800; font-size: 12.5px; color: #22543D; margin-bottom: 4px; }}
-  .mindset-desc {{ font-size: 12px; color: #276749; margin: 0; font-weight: 600; }}
-
-  .checkpoint-box {{ background-color: #FFFDF5; border: 1.5px solid #F6E05E; border-left: 5px solid #D69E2E; border-radius: 4px 8px 8px 4px; padding: 10px 14px; margin: 12px 0; font-size: 12.5px; color: #744210; line-height: 1.6; }}
-  .checkpoint-tag {{ font-weight: 800; color: #B7791F; background-color: #FEFCBF; padding: 2px 6px; border-radius: 4px; margin-right: 4px; font-size: 11.5px; }}
-  .tutor-add {{ color: #4A5568; font-size: 11.5px; margin-left: 4px; font-weight: normal; }}
-
-  .analogy-box {{ background-color: #FDF2F8; border: 1.5px solid #FBCFE8; border-left: 5px solid #DB2777; border-radius: 4px 8px 8px 4px; padding: 10px 14px; margin: 12px 0; }}
-  .analogy-header {{ font-weight: 800; font-size: 12px; color: #9D174D; margin-bottom: 2px; }}
-  .analogy-desc {{ font-size: 12px; color: #831843; margin: 0; font-weight: 600; line-height: 1.5; }}
-
-  .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
+  /* 헤더 섹션 */
+  .header-container {{ 
+    border-bottom: 2px solid #0F172A; 
+    padding-bottom: 12px; 
+    margin-bottom: 22px; 
+  }}
+  .doc-title {{ 
+    font-size: 21px; 
+    font-weight: 800; 
+    color: #0F172A; 
+    margin: 0 0 6px 0; 
+    letter-spacing: -0.5px;
+  }}
+  .doc-subtitle {{ font-size: 12px; color: #64748B; margin: 0; font-weight: 500; }}
   
-  .svg-container {{ text-align: center; margin: 18px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; }}
+  /* 제목 태그 */
+  h2 {{ 
+    font-size: 15.5px; 
+    font-weight: 700; 
+    color: #0F172A; 
+    border-left: 3.5px solid #2563EB; 
+    padding-left: 9px; 
+    margin-top: 26px; 
+    margin-bottom: 12px; 
+    letter-spacing: -0.3px;
+  }}
+  h3 {{ 
+    font-size: 13.5px; 
+    font-weight: 700; 
+    color: #334155; 
+    margin-top: 18px; 
+    margin-bottom: 8px; 
+  }}
+
+  /* 4대 컬러 전용 뱃지 (Badge) 시스템 */
+  .badge {{
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-right: 6px;
+    letter-spacing: -0.2px;
+    vertical-align: middle;
+  }}
+  .badge-red {{ background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }}
+  .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
+  .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
+  .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
+
+  /* 4대 컬러 모던 노트 박스 */
+  .note-box {{
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    font-size: 12.5px;
+    line-height: 1.65;
+  }}
+  .note-red {{ border-left: 4px solid #DC2626; background-color: #FEF2F20D; }}
+  .note-blue {{ border-left: 4px solid #2563EB; background-color: #EFF6FF0D; }}
+  .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
+  .note-purple {{ border-left: 4px solid #7C3AED; background-color: #FAF5FF0D; }}
+
+  /* SVG 다이어그램 컨테이너 */
+  .svg-container {{ 
+    text-align: center; 
+    margin: 20px 0; 
+    background-color: #FFFFFF; 
+    border: 1px solid #E2E8F0; 
+    border-radius: 8px; 
+    padding: 14px; 
+    overflow: hidden; 
+  }}
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
-  .caption {{ font-size: 11.5px; color: #4A5568; font-weight: 600; margin-top: 8px; text-align: center; }}
+  .caption {{ font-size: 11.5px; color: #64748B; font-weight: 600; margin-top: 8px; text-align: center; }}
 
-  .practice-box {{ background-color: #F8FAFC; border: 1.5px solid #CBD5E0; border-left: 5px solid #4C51BF; border-radius: 4px 8px 8px 4px; padding: 16px; margin: 24px 0; }}
-  .practice-header {{ font-weight: 800; font-size: 14px; color: #3C366B; margin-bottom: 10px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; }}
-  .practice-question {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; margin-bottom: 12px; font-size: 12.5px; line-height: 1.6; }}
-  .practice-solution {{ background-color: #F7FAFC; border-radius: 6px; padding: 10px 12px; font-size: 12px; }}
-  .practice-solution .step-label {{ font-weight: 700; color: #2B6CB0; margin-top: 8px; margin-bottom: 2px; }}
-  .calc-step {{ background-color: #FFFFFF; border: 1px solid #EDF2F7; border-radius: 4px; padding: 8px; margin: 4px 0 8px 0; text-align: center; }}
+  /* 학습 점검 실전 예제 (Practice Box) - 보라색 테마 */
+  .practice-box {{ 
+    background-color: #FFFFFF; 
+    border: 1px solid #E9D5FF; 
+    border-left: 4px solid #7C3AED; 
+    border-radius: 6px; 
+    padding: 15px; 
+    margin: 24px 0; 
+  }}
+  .practice-header {{ 
+    font-weight: 700; 
+    font-size: 13.5px; 
+    color: #5B21B6; 
+    margin-bottom: 10px; 
+    border-bottom: 1px solid #F3E8FF; 
+    padding-bottom: 6px; 
+  }}
+  .practice-question {{ 
+    background-color: #FAF5FF; 
+    border: 1px solid #F3E8FF; 
+    border-radius: 4px; 
+    padding: 11px; 
+    margin-bottom: 10px; 
+    font-size: 12.5px; 
+    line-height: 1.6; 
+  }}
+  .practice-solution {{ 
+    background-color: #FFFFFF; 
+    padding: 6px 4px; 
+    font-size: 12px; 
+  }}
+  .practice-solution .step-label {{ 
+    font-weight: 700; 
+    color: #7C3AED; 
+    margin-top: 8px; 
+    margin-bottom: 2px; 
+  }}
+  .calc-step {{ 
+    background-color: #FAF5FF; 
+    border: 1px solid #F3E8FF; 
+    border-radius: 4px; 
+    padding: 8px; 
+    margin: 4px 0 8px 0; 
+    text-align: center; 
+  }}
 
-  .concept-map {{ display: flex; justify-content: space-between; align-items: stretch; background-color: #F7FAFC; border: 1px solid #CBD5E0; border-radius: 8px; padding: 14px; margin: 16px 0; gap: 10px; }}
-  .map-col {{ flex: 1; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; }}
-  .map-header {{ font-weight: 700; font-size: 13px; color: #2B6CB0; margin-bottom: 8px; border-bottom: 1.5px solid #E2E8F0; padding-bottom: 4px; text-align: center; }}
-
-  .voice-phishing-box {{ background-color: #FAF5FF; border: 1.5px solid #D6BCFA; border-left: 5px solid #805AD5; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 16px 0; }}
-  .trap-box {{ background-color: #FFF5F5; border: 1.5px solid #FEB2B2; border-left: 5px solid #E53E3E; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin: 14px 0; }}
-
-  .cheat-sheet-table {{ width: 100%; border-collapse: collapse; margin: 20px 0 10px 0; font-size: 12px; }}
-  .cheat-sheet-table th {{ background-color: #2B6CB0; color: #FFFFFF; font-weight: 700; padding: 8px 10px; border: 1px solid #CBD5E0; text-align: center; }}
-  .cheat-sheet-table td {{ border: 1px solid #E2E8F0; padding: 8px 10px; text-align: center; background-color: #FFFFFF; }}
-  .cheat-sheet-table tr:nth-child(even) td {{ background-color: #F7FAFC; }}
+  /* 치트시트 테이블 */
+  .cheat-sheet-table {{ 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 20px 0 10px 0; 
+    font-size: 12px; 
+  }}
+  .cheat-sheet-table th {{ 
+    background-color: #0F172A; 
+    color: #FFFFFF; 
+    font-weight: 600; 
+    padding: 8px 10px; 
+    border: 1px solid #334155; 
+    text-align: center; 
+  }}
+  .cheat-sheet-table td {{ 
+    border: 1px solid #E2E8F0; 
+    padding: 8px 10px; 
+    text-align: center; 
+    background-color: #FFFFFF; 
+  }}
+  .cheat-sheet-table tr:nth-child(even) td {{ background-color: #F8FAFC; }}
 </style>
 </head>
 <body>
@@ -350,7 +465,7 @@ def update_notion_success(page_id: str, download_url: str):
         except Exception:
             notion.pages.update(
                 page_id=page_id,
-                properties={"정리본 링크": {"url": download_url}}
+                properties={"정리본 링크": {"url": download_url}},
             )
 
 
