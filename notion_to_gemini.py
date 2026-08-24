@@ -23,6 +23,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
+    "gemini-3.7-flash",
     "gemini-3.5-flash-lite",
 ]
 
@@ -145,7 +146,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요. (코드블록 백틱 ```html 은 생략하거나 감싸도 무방)
 
 ★ [본문 텍스트 절대 규칙: 한자 사용 금지]
-본문의 모든 설명 텍스트, 제목, 뱃지, 노트 박스 내부 등 답변 전체에서 한자(漢字)를 절대로 사용하지 마세요. 모든 한자 용어는 한글 전용 표기로 바꾸거나 쉬운 한글 표현으로 수정하여 작성해야 합니다. (예: 恒等式 -> 항등식, 誘導 -> 유도, 磁氣場 -> 자기장)
+본문의 모든 설명 텍스트, 제목, 뱃지, 노트 박스 내부 등 답변 전체에서 한자(漢字)를 절대로 사용하지 마세요. 모든 한자 용어는 한글 전용 표기로 바꾸거나 쉬운 한글 표현으로 수정하여 작성해야 합니다.
 
 ★ [4대 전용 컬러 배정 및 마크업 통일 규칙]
 본문의 모든 박스와 뱃지는 반드시 아래 지정된 4가지 클래스만 사용하세요:
@@ -171,16 +172,11 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
      </div>
    </div>
 
-★ [수식 표기 및 벡터 규격 (절대 규칙)]
-1. 본문 HTML/LaTeX 수식 (PDF 렌더링):
-   - 화살표 뭉개짐을 방지하기 위해 모든 벡터는 \\vec{{...}} 또는 \\overrightarrow{{...}}를 사용할 것! (예: \\vec{{F}}, \\vec{{r}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{v}})
-   - 단위 벡터는 윗꺽쇠 표기: \\hat{{n}}, \\hat{{r}}, \\hat{{i}}, \\hat{{j}}, \\hat{{k}}, \\hat{{\\phi}}, \\hat{{\\theta}}
-   - 미소 벡터 요소: d\\vec{{r}}, d\\vec{{l}}, d\\vec{{S}} = \\hat{{n}} dS
-2. SVG 그래픽 도판 내부 수식/라벨 (SVG 표준):
-   - SVG 내부에서는 폰트 렌더링 오차 및 글자 어긋남을 원천 방지하기 위해, 화살표 오버레이 대신 **글로벌 대학 교재 표준 볼드 이탤릭체(Bold Italic)**로 작성할 것!
-   - 벡터량: <tspan font-style="italic" font-weight="bold">F</tspan>, <tspan font-style="italic" font-weight="bold">r</tspan>, <tspan font-style="italic" font-weight="bold">E</tspan>, <tspan font-style="italic" font-weight="bold">B</tspan>, <tspan font-style="italic" font-weight="bold">A</tspan>, <tspan font-style="italic" font-weight="bold">I</tspan>, d<tspan font-style="italic" font-weight="bold">l</tspan>
-   - 단위 벡터: <tspan font-style="italic" font-weight="bold">n̂</tspan>, <tspan font-style="italic" font-weight="bold">r̂</tspan>, <tspan font-style="italic" font-weight="bold">ϕ̂</tspan>
-   - 스칼라/좌표/주기: <tspan font-style="italic">x</tspan>, <tspan font-style="italic">y</tspan>, <tspan font-style="italic">z</tspan>, <tspan font-style="italic">t</tspan>, <tspan font-style="italic">T</tspan>, <tspan font-style="italic">r</tspan>, <tspan font-style="italic">R</tspan>, <tspan font-style="italic">θ</tspan>
+★ [LaTeX 수식 표기 절대 규칙 (렌더링 깨짐 원천 차단)]
+1. 인라인 수식은 반드시 단일 달러 기호 `$수식$` 또는 `\\(수식\\)`만 사용하세요. (절대 `\\$`나 `$\\$` 형태로 이중 이스케이프 금지)
+2. 디스플레이(블록) 수식은 반드시 `$$수식$$` 또는 `\\[수식\\]`만 사용하세요.
+3. 모든 벡터는 상단 화살표 `\\vec{{...}}` 또는 `\\overrightarrow{{...}}`를 사용하세요. (예: `\\vec{{F}}`, `\\vec{{r}}`, `\\vec{{E}}`, `\\vec{{B}}`)
+4. 단위 벡터는 `\\hat{{n}}`, `\\hat{{r}}`, `\\hat{{i}}`, `\\hat{{j}}`, `\\hat{{k}}`, `\\hat{{\\phi}}`를 사용하세요.
 
 ★ [전공 표준 SVG 그래픽 도판 작도 절대 규칙 (단원별 핵심 개념마다 최소 2~4개 필수 삽입)]
 - 모든 SVG는 반드시 아래 구조로 감싸서 작성:
@@ -190,14 +186,12 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
     </svg>
     <p class="caption">그림 X. [도해에 대한 명확한 한글 캡션]</p>
   </div>
-- 스타일 테마: 불필요한 화려한 원색을 배제하고, 깔끔한 **모노크롬(흑백) 출판 스타일**(`#0f172a`, 배경 `#f8fafc`, 점선/보조선 `#94a3b8`, 텍스트 `#475569`) 준수.
-- 기하학적 엄밀성 (Mathematical Rigor):
-  * 임의의 제어점 추정 금지. 원점 $O(x_0, y_0)$과 스케일을 정하고 **실제 함수 수식 수치 샘플링(Numerical Sampling)**을 기반으로 경로(path/line)를 생성할 것.
-  * 닫힌 곡선/곡면 및 도선 작도 시 모서리 꺾임(Cusp)이 없도록 **접선 벡터가 연속인 $C^1$ 매끄러운 스무딩** 적용.
-  * 2차원 함수 그래프: 점근선, 평균선, 특이점(극대/극소/절편)은 수선 점선(`stroke-dasharray="4 3"`)과 좌표 틱(Tick)을 정확히 일치시키고, 주기 구간 치수선(양방향 화살표)을 명확히 표기할 것.
-  * 2차원 벡터장: 정방형 뷰박스(`viewBox="0 0 520 520"`) 내에서 격자 샘플링 기반으로 화살표 방향과 크기를 비례적으로 정밀 배치할 것.
-  * 3차원 입체 도판: 타원 투시(Perspective Squashing)를 적용하고, 은면 윤곽 점선과 외향 단위 법선 벡터(n̂), 폐경로(C), 미소 체적/면적 요소(dV, dS)를 정밀하게 묘사할 것.
-  * 도판 내 한자(漢字) 사용은 절대 금지.
+- SVG 내부 텍스트는 LaTeX 문법(`$..$`)을 쓰지 말고 순수 SVG 텍스트 태그 `<tspan>`을 사용할 것!
+  * 벡터량: <tspan font-style="italic" font-weight="bold">F</tspan>, <tspan font-style="italic" font-weight="bold">B</tspan>
+  * 스칼라/좌표: <tspan font-style="italic">x</tspan>, <tspan font-style="italic">y</tspan>, <tspan font-style="italic">r</tspan>
+- 테마: 모노크롬(`#0f172a`, 배경 `#f8fafc`, 점선 `#94a3b8`, 텍스트 `#475569`) 준수.
+- 수치 샘플링(Numerical Sampling) 기반 $C^1$ 매끄러운 곡선 적용.
+- 도판 내 한자(漢字) 사용 절대 금지.
 
 ★ [시험 대비 종합 치트시트 테이블]
 최하단에 <table class="cheat-sheet-table">로 핵심 공식, 물리적/수학적 의미, 주요 기하학적 정리를 표로 집대성할 것. (한자 사용 절대 금지)
@@ -252,6 +246,9 @@ def build_full_html(title: str, content_html: str) -> str:
         r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE
     )
 
+    # 제미나이가 잘못 생성한 이중 이스케이프 (\$ -> $) 전처리 보정
+    clean_html = clean_html.replace(r"\$", "$")
+
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -259,72 +256,76 @@ def build_full_html(title: str, content_html: str) -> str:
 <title>{title}</title>
 <link rel="stylesheet" href="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css)">
 <script defer src="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js)"></script>
-<script defer src="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js)"
-        onload="renderMathInElement(document.body, {{
-            delimiters: [
-                {{left: '$$', right: '$$', display: true}},
-                {{left: '$', right: '$', display: false}}
-            ],
-            macros: {{
-                '\\\\vec': '\\\\overrightarrow',
-                '\\\\oiint': '\\\\oint\\\\mkern-13mu\\\\oint'
-            }},
-            throwOnError: false
-        }});"></script>
+<script defer src="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js)"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {{
+    renderMathInElement(document.body, {{
+      delimiters: [
+        {{left: '$$', right: '$$', display: true}},
+        {{left: '$', right: '$', display: false}},
+        {{left: '\\\\[', right: '\\\\]', display: true}},
+        {{left: '\\\\(', right: '\\\\)', display: false}}
+      ],
+      macros: {{
+        '\\\\vec': '\\\\overrightarrow',
+        '\\\\oiint': '\\\\oint\\\\mkern-13mu\\\\oint'
+      }},
+      throwOnError: false
+    }});
+    document.body.classList.add('katex-rendered');
+  }});
+</script>
 <style>
   @import url('[https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap](https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap)');
-  @page {{ size: A4; margin: 18mm 14mm; }}
+  @page {{ size: A4; margin: 16mm 12mm; }}
   body {{ 
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; 
     color: #1E293B; 
-    line-height: 1.75; 
-    font-size: 13px; 
+    line-height: 1.7; 
+    font-size: 12.5px; 
     margin: 0; 
     background-color: #FFFFFF;
   }}
   
-  /* 헤더 섹션 */
   .header-container {{ 
     border-bottom: 2px solid #0F172A; 
-    padding-bottom: 12px; 
-    margin-bottom: 22px; 
+    padding-bottom: 10px; 
+    margin-bottom: 18px; 
   }}
   .doc-title {{ 
-    font-size: 21px; 
+    font-size: 20px; 
     font-weight: 800; 
     color: #0F172A; 
-    margin: 0 0 6px 0; 
+    margin: 0 0 4px 0; 
     letter-spacing: -0.5px;
   }}
-  .doc-subtitle {{ font-size: 12px; color: #64748B; margin: 0; font-weight: 500; }}
+  .doc-subtitle {{ font-size: 11.5px; color: #64748B; margin: 0; font-weight: 500; }}
   
-  /* 제목 태그 */
   h2 {{ 
-    font-size: 15.5px; 
+    font-size: 15px; 
     font-weight: 700; 
     color: #0F172A; 
     border-left: 3.5px solid #2563EB; 
-    padding-left: 9px; 
-    margin-top: 26px; 
-    margin-bottom: 12px; 
+    padding-left: 8px; 
+    margin-top: 22px; 
+    margin-bottom: 10px; 
     letter-spacing: -0.3px;
   }}
   h3 {{ 
-    font-size: 13.5px; 
+    font-size: 13px; 
     font-weight: 700; 
     color: #334155; 
-    margin-top: 18px; 
-    margin-bottom: 8px; 
+    margin-top: 16px; 
+    margin-bottom: 6px; 
   }}
 
-  /* 4대 컬러 전용 뱃지 (Badge) 시스템 */
   .badge {{
     display: inline-block;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    padding: 2px 7px;
+    padding: 2px 6px;
     border-radius: 4px;
-    margin-right: 6px;
+    margin-right: 5px;
     letter-spacing: -0.2px;
     vertical-align: middle;
   }}
@@ -333,98 +334,94 @@ def build_full_html(title: str, content_html: str) -> str:
   .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
   .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
 
-  /* 4대 컬러 모던 노트 박스 */
   .note-box {{
     background-color: #FFFFFF;
     border: 1px solid #E2E8F0;
     border-radius: 6px;
-    padding: 12px 14px;
-    margin: 12px 0;
-    font-size: 12.5px;
-    line-height: 1.65;
+    padding: 10px 12px;
+    margin: 10px 0;
+    font-size: 12px;
+    line-height: 1.6;
   }}
   .note-red {{ border-left: 4px solid #DC2626; background-color: #FEF2F20D; }}
   .note-blue {{ border-left: 4px solid #2563EB; background-color: #EFF6FF0D; }}
   .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
   .note-purple {{ border-left: 4px solid #7C3AED; background-color: #FAF5FF0D; }}
 
-  /* SVG 다이어그램 컨테이너 */
   .svg-container {{ 
     text-align: center; 
-    margin: 20px 0; 
+    margin: 16px 0; 
     background-color: #FFFFFF; 
     border: 1px solid #E2E8F0; 
-    border-radius: 8px; 
-    padding: 14px; 
+    border-radius: 6px; 
+    padding: 12px; 
     overflow: hidden; 
   }}
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
-  .caption {{ font-size: 11.5px; color: #64748B; font-weight: 600; margin-top: 8px; text-align: center; }}
+  .caption {{ font-size: 11px; color: #64748B; font-weight: 600; margin-top: 6px; text-align: center; }}
 
-  /* 학습 점검 실전 예제 (Practice Box) - 보라색 테마 */
   .practice-box {{ 
     background-color: #FFFFFF; 
     border: 1px solid #E9D5FF; 
     border-left: 4px solid #7C3AED; 
     border-radius: 6px; 
-    padding: 15px; 
-    margin: 24px 0; 
+    padding: 12px; 
+    margin: 18px 0; 
   }}
   .practice-header {{ 
     font-weight: 700; 
-    font-size: 13.5px; 
+    font-size: 13px; 
     color: #5B21B6; 
-    margin-bottom: 10px; 
+    margin-bottom: 8px; 
     border-bottom: 1px solid #F3E8FF; 
-    padding-bottom: 6px; 
+    padding-bottom: 4px; 
   }}
   .practice-question {{ 
     background-color: #FAF5FF; 
     border: 1px solid #F3E8FF; 
     border-radius: 4px; 
-    padding: 11px; 
-    margin-bottom: 10px; 
-    font-size: 12.5px; 
-    line-height: 1.6; 
+    padding: 9px; 
+    margin-bottom: 8px; 
+    font-size: 12px; 
+    line-height: 1.55; 
   }}
   .practice-solution {{ 
     background-color: #FFFFFF; 
-    padding: 6px 4px; 
-    font-size: 12px; 
+    padding: 4px; 
+    font-size: 11.5px; 
   }}
   .practice-solution .step-label {{ 
     font-weight: 700; 
     color: #7C3AED; 
-    margin-top: 8px; 
+    margin-top: 6px; 
     margin-bottom: 2px; 
   }}
   .calc-step {{ 
     background-color: #FAF5FF; 
     border: 1px solid #F3E8FF; 
     border-radius: 4px; 
-    padding: 8px; 
-    margin: 4px 0 8px 0; 
+    padding: 6px; 
+    margin: 4px 0 6px 0; 
     text-align: center; 
   }}
 
-  /* 치트시트 테이블 */
   .cheat-sheet-table {{ 
     width: 100%; 
     border-collapse: collapse; 
-    margin: 20px 0 10px 0; 
-    font-size: 12px; 
+    margin: 16px 0 8px 0; 
+    font-size: 11.5px; 
   }}
   .cheat-sheet-table th {{ 
     background-color: #0F172A; 
     color: #FFFFFF; 
     font-weight: 600; 
-    padding: 8px 10px; 
+    padding: 6px 8px; 
     border: 1px solid #334155; 
     text-align: center; 
   }}
   .cheat-sheet-table td {{ 
     border: 1px solid #E2E8F0; 
-    padding: 8px 10px; 
+    padding: 6px 8px; 
     text-align: center; 
     background-color: #FFFFFF; 
   }}
@@ -447,16 +444,25 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
-        page.wait_for_timeout(1000)
+        
+        # KaTeX 렌더링 완료 및 폰트 로딩 대기
+        try:
+            page.wait_for_selector(".katex-rendered", timeout=5000)
+        except Exception:
+            page.wait_for_timeout(2000)
+            
+        page.evaluate("document.fonts.ready")
+        page.wait_for_timeout(500)
+
         page.pdf(
             path=output_pdf_path,
             format="A4",
             print_background=True,
             margin={
-                "top": "15mm",
-                "bottom": "15mm",
-                "left": "15mm",
-                "right": "15mm",
+                "top": "12mm",
+                "bottom": "12mm",
+                "left": "12mm",
+                "right": "12mm",
             },
         )
         browser.close()
