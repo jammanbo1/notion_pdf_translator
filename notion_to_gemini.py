@@ -20,11 +20,10 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
-# --- 이전 코드의 모델 설정을 그대로 유지 ---
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
-    "gemini-3.5-flash-lite"
+    "gemini-3.5-flash-lite",
 ]
 
 
@@ -134,9 +133,8 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
-    # --- 프롬프트 수정: 한자 사용 절대 금지 규칙 추가 및 SVG 작도 규칙 제거 ---
-    prompt_text = f"""당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 편집자입니다.
-첨부된 자료를 정밀 분석하여, 지정된 4대 컬러 체계(빨간색/파란색/초록색/보라색)로 완벽히 통일된 최고급 A4 요약 리포트를 작성해주세요.
+    prompt_text = f"""당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 수석 기술 편집자입니다.
+첨부된 자료를 정밀 분석하여, 지정된 4대 컬러 체계(빨간색/파란색/초록색/보라색)와 대학 출판 표준 기하학적 SVG 도판이 완벽히 포함된 최고급 A4 요약 리포트를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
 
 [필수 출력 양식 1단계: 제목 생성]
@@ -144,25 +142,18 @@ def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", u
 DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
 [2단계: 본문 HTML 작성]
-제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
+제목 아랫줄부터는 본문 HTML 코드만 작성하세요. (코드블록 백틱 ```html 은 생략하거나 감싸도 무방)
 
-★ [본문 텍스트 절대 규칙: 한자 사용 금지]
-본문의 모든 설명 텍스트, 제목, 뱃지, 노트 박스 내부 등 답변 전체에서 한자(漢字)를 절대로 사용하지 마세요. 모든 한자 용어는 한글 전용 표기로 바꾸거나 쉬운 한글 표현으로 수정하여 작성해야 합니다. (예: 핵심恒等式 -> 핵심 항등식, 誘導 -> 유도)
-
-★ [4대 전용 컬러 배정 및 마크업 통일 절대 규칙]
+★ [4대 전용 컬러 배정 및 마크업 통일 규칙]
 본문의 모든 박스와 뱃지는 반드시 아래 지정된 4가지 클래스만 사용하세요:
-
-1. 빨간색 (Red) -> [중요], [체크포인트], 핵심 공식/유도:
+1. 빨간색 (Red) -> [중요], [체크포인트], 핵심 공식 유도:
    - <div class="note-box note-red"><span class="badge badge-red">중요</span> ...</div>
    - <div class="note-box note-red"><span class="badge badge-red">핵심 공식 유도</span> ...</div>
-
 2. 파란색 (Blue) -> [핵심 개념], [학습 목표]:
    - <div class="note-box note-blue"><span class="badge badge-blue">학습 목표</span> ...</div>
    - <div class="note-box note-blue"><span class="badge badge-blue">핵심 개념</span> ...</div>
-
 3. 초록색 (Green) -> [직관 비유], [해석 팁]:
    - <div class="note-box note-green"><span class="badge badge-green">직관 비유</span> ...</div>
-
 4. 보라색 (Purple) -> [학습 점검], [실전 예제]:
    <div class="practice-box">
      <div class="practice-header"><span class="badge badge-purple">학습 점검</span> 실전 기출/적용 예제</div>
@@ -177,17 +168,31 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
      </div>
    </div>
 
-★ [벡터 및 수식 표기 절대 통일 규칙]
-1. PDF 본문 HTML/LaTeX 수식: 뭉개짐 방지를 위해 **상단 확장 화살표(\\vec{{...}} 또는 \\overrightarrow{{...}})**를 사용할 것!
-   - 예: \\vec{{F}}, \\vec{{r}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{v}}
-   - 단위 벡터: \\hat{{n}}, \\hat{{r}}, \\hat{{i}}, \\hat{{j}}, \\hat{{k}}
+★ [수식 표기 및 벡터 규격 (절대 규칙)]
+1. 본문 HTML/LaTeX 수식 (PDF 렌더링):
+   - 화살표 뭉개짐을 방지하기 위해 모든 벡터는 \\vec{{...}} 또는 \\overrightarrow{{...}}를 사용할 것! (예: \\vec{{F}}, \\vec{{r}}, \\vec{{E}}, \\vec{{B}}, \\vec{{v}})
+   - 단위 벡터는 윗꺽쇠 표기: \\hat{{n}}, \\hat{{r}}, \\hat{{i}}, \\hat{{j}}, \\hat{{k}}
+   - 미소 벡터 요소: d\\vec{{r}}, d\\vec{{l}}, d\\vec{{S}} = \\hat{{n}} dS
+2. SVG 그래픽 도판 내부 수식/라벨 (SVG 표준):
+   - SVG 내부에서는 폰트 렌더링 오차 및 글자 어긋남을 원천 방지하기 위해, 화살표 오버레이 대신 **글로벌 대학 교재 표준 볼드 이탤릭체(Bold Italic)**로 작성할 것!
+   - 벡터량: <tspan font-style="italic" font-weight="bold">F</tspan>, <tspan font-style="italic" font-weight="bold">r</tspan>, <tspan font-style="italic" font-weight="bold">E</tspan>
+   - 단위 벡터: <tspan font-style="italic" font-weight="bold">n̂</tspan>, <tspan font-style="italic" font-weight="bold">r̂</tspan>
+   - 스칼라/좌표: <tspan font-style="italic">x</tspan>, <tspan font-style="italic">y</tspan>, <tspan font-style="italic">z</tspan>, <tspan font-style="italic">t</tspan>, <tspan font-style="italic">V</tspan>, <tspan font-style="italic">S</tspan>
+
+★ [전공 표준 SVG 그래픽 도판 작도 규칙 (최소 3~4개 필수 삽입)]
+- 모든 SVG는 <div class="svg-container"><svg viewBox="0 0 520 360" ...>...</svg><p class="caption">그림 X. 설명</p></div> 형식으로 작성.
+- 스타일 테마: 불필요한 화려한 원색을 배제하고, 깔끔한 **모노크롬(흑백) 출판 스타일**(`#0f172a`, 배경 `#f8fafc`, 점선 `#94a3b8`) 준수.
+- 기하학적 엄밀성 (Mathematical Rigor):
+  * 임의의 제어점 추정 금지. 원점 $O(x_0, y_0)$과 스케일을 정하고 **실제 함수 수식 수치 샘플링(Numerical Sampling)**을 기반으로 경로(path)를 생성할 것.
+  * 닫힌 곡선/곡면 작도 시 모서리 꺾임(Cusp)이 없도록 **접선 벡터가 연속인 $C^1$ 매끄러운 스무딩** 적용.
+  * 점근선(Asymptote) 및 특이점(극대/극소/절편)은 수선 점선(`stroke-dasharray="4 3"`)과 좌표 틱(Tick)을 정확히 일치시킬 것.
+  * 3차원 입체 도판의 경우 은면 윤곽 점선과 외향 단위 법선 벡터(n̂), 미소 체적/면적 요소(dV, dS)를 정밀하게 묘사할 것.
 
 ★ [시험 대비 종합 치트시트 테이블]
-최하단에 <table class="cheat-sheet-table">로 핵심 공식 및 정리를 성질별로 집대성 요약 정리. (이 부분 역시 한자 사용 절대 금지)
+최하단에 <table class="cheat-sheet-table">로 핵심 공식, 물리적 의미, 주요 기하학적 정리를 표로 집대성할 것.
 """
     content_payload.append(prompt_text)
 
-    # --- 이전 코드의 requests 사용 방식을 유지 ---
     for item in file_list:
         res = requests.get(item["url"], stream=True, timeout=120)
         res.raise_for_status()
@@ -236,15 +241,14 @@ def build_full_html(title: str, content_html: str) -> str:
         r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE
     )
 
-    # --- KaTeX 설정에 화살표 매크로 설정을 보완하여 유지 ---
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <title>{title}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+<link rel="stylesheet" href="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css)">
+<script defer src="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js)"></script>
+<script defer src="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js)"
         onload="renderMathInElement(document.body, {{
             delimiters: [
                 {{left: '$$', right: '$$', display: true}},
@@ -257,10 +261,10 @@ def build_full_html(title: str, content_html: str) -> str:
             throwOnError: false
         }});"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+  @import url('[https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap](https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap)');
   @page {{ size: A4; margin: 18mm 14mm; }}
   body {{ 
-    font-family: 'Pretendard', sans-serif; 
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; 
     color: #1E293B; 
     line-height: 1.75; 
     font-size: 13px; 
@@ -333,7 +337,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
   .note-purple {{ border-left: 4px solid #7C3AED; background-color: #FAF5FF0D; }}
 
-  /* SVG 다이어그램 컨테이너 - 그래프 제거로 사용 빈도 낮지만 스타일 유지 */
+  /* SVG 다이어그램 컨테이너 */
   .svg-container {{ 
     text-align: center; 
     margin: 20px 0; 
@@ -497,7 +501,6 @@ def main():
             print(f"분석 시작 (과목: '{subject_hint}', 단원명: '{unit_hint}', 첨부파일 {len(files)}개)...")
 
             try:
-                # 제미나이가 그래프를 그리는 SVG 작도 부분을 제외하고 텍스트로만 요약하도록 프롬프트가 수정됨
                 doc_title, body_html = extract_and_design_multiple_files(files, subject_hint, unit_hint)
                 
                 safe_title = sanitize_filename(doc_title)
@@ -507,7 +510,7 @@ def main():
                 temp_pdf_path = os.path.join(temp_dir, f"{safe_title}.pdf")
                 render_html_to_pdf(full_html, temp_pdf_path)
 
-                print("  -> GitHub Storage에 업로드 중...")
+                print("  -> GitHub Release에 업로드 중...")
                 pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{safe_title}.pdf")
                 print(f"  -> 다운로드 링크: {pdf_url}")
 
