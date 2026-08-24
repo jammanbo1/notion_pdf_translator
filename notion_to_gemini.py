@@ -20,7 +20,6 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 우선순위별 모델 폴백 리스트
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
@@ -134,8 +133,8 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     prompt = f"""
-당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 시각화 튜터입니다.
-첨부된 자료를 심층 분석하여 학문 분야별로 가장 최적화된 고품질 인라인 SVG 도식(최소 3~5개 이상)이 포함된 최고급 A4 요약 리포트를 작성해주세요.
+당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 삽화가입니다.
+첨부된 자료를 정밀 분석하여, 표준 전공 교재(Stewart Calculus 9th, Griffiths Electrodynamics, Feynman Lectures)의 Figure와 100% 일치하는 엄밀한 SVG 다이어그램이 포함된 A4 요약 리포트를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
 
 [필수 출력 양식 1단계: 제목 생성]
@@ -145,33 +144,34 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-[핵심 규칙: 전공 도메인별 맞춤형 SVG 시각화 가이드라인]
-입력된 자료의 학문 분야에 맞추어 아래 규격에 맞는 인라인 SVG(<div class="svg-container"><svg viewBox="0 0 600 350" ...>...</svg><p class="caption">도식 설명</p></div>)를 정밀 코딩하세요:
+[핵심 규칙: 전공 표준 교재 Figure(도판) 1:1 완벽 정밀 복원]
+절대로 개념과 무관한 임의의 그림이나 장식용 다이어그램을 그리지 마세요.
+수학/물리 개념이 등장할 경우, 반드시 아래 명시된 '세계 표준 교재의 정식 Figure 구조'를 그대로 SVG(<div class="svg-container"><svg viewBox="0 0 600 350" ...>...</svg><p class="caption">Fig. [교재식 번호 및 설명]</p></div>)로 작도하세요 (최소 3~5개 이상 필수):
 
-1. 수학/해석학/미적분학 (평가원/수능 수학 시험지 스타일 직교좌표계):
-   - 축 작도: 얇고 날카로운 화살표 마커의 $x, y$ 직교좌표축, 원점 $O$, 축 라벨 ($x, y$ 이탤릭).
-   - 함수 곡선: 부드러운 3차 베지에 곡선(<path d="M... C...">)으로 삼/사차함수, 극값, 변곡점, 점근선 표현.
-   - 특이점/보조선: 극대/극소/교점의 검은 원점(<circle r="3" fill="#000"/>), 접선, 수선의 발 점선(stroke-dasharray="3,3").
-   - 정적분 영역: 둘러싸인 면적의 빗금 패턴(<pattern> 기반의 diagonal hatch).
+★ 1. James Stewart Calculus (Early Transcendentals 9th) 표준 Figure 규격:
+   - 3차원 오른손 좌표계 ($x, y, z$ 축): $z$축 수직 상향, $y$축 우측 수평, $x$축 좌하단 45도 투영 경사축과 원점 $O$.
+   - 벡터장 & 등위면 (Level Surface / Gradient):
+     * 스칼라 함수 등위곡선군($T=10^\circ, 20^\circ, 30^\circ, \dots$)과 각 곡선에 국소적으로 완전 직교(Orthogonal)하는 그레이디언트 벡터장 $\nabla f$ (또는 열유속 $\vec{h}=-k\nabla T$) 화살표 다발.
+   - 곡면적 및 선적분 (Surface Integral & Stokes' Theorem):
+     * 3차원 곡면 $S$, 경계 곡선 $C=\partial S$의 양의 방향(Right-hand rule 회전 화살표), 곡면 위의 미소 면적 패치 $dS$와 외향 단위 법선 벡터 $\vec{n}$.
+     * $xy$ 평면 위의 정사영 영역 $D$와 점선 투영 보조선.
 
-2. 물리학/전자기학/기계 (파인만 물리학 강의 스타일 3D/벡터장):
-   - 3D 폐곡면(Closed Surface): 유려한 베지에 곡선과 입체감을 주는 타원형 경선/위선 점선 호.
-   - 벡터장 & 성분 분해: 면을 관통하는 벡터 화살표들과, 접평면에 수직인 법선 벡터(Normal Component) 및 직교 사영 점선 보조선.
-   - 유선(Streamline) & 폐루프 관(Tube): 와도/순환(Curl/Circulation)을 나타내는 곡선 유선 화살표.
+★ 2. David J. Griffiths Electrodynamics & Feynman Lectures on Physics 표준 Figure 규격:
+   - 가우스 법칙 (Gauss's Law & Flux):
+     * 임의의 3차원 폐곡면(Closed Surface $S$)을 통과하는 벡터장선(Streamlines)과 표면 위의 미소 벡터 면적 요소 $d\vec{a} = \hat{n} da$.
+     * 표면을 뚫고 나가는 벡터 $\vec{v}$ (또는 $\vec{E}$)와 외향 법선 벡터 성분($v_\perp = \vec{v}\cdot\hat{n}$), 직교 분해 점선 보조선 및 직각 기호.
+   - 와도 및 순환 (Curl & Circulation):
+     * 벡터장의 소용돌이 유선(Streamlines)과 그 내부를 순환하는 폐회로 루프(Amperian tube / loop), 선적분 미소 변위 $d\vec{l}$과 접선 성분 $v_\parallel$.
+   - 정전기학 소스 & 필드:
+     * 원점 $O$, 소스 위치 벡터 $\vec{r}'$, 관측점 위치 벡터 $\vec{r}$, 분리 벡터 $\vec{\boldsymbol{\imath}} = \vec{r} - \vec{r}'$ 삼각 벡터 결합도.
 
-3. 생명과학/분자유전학/생화학:
-   - 플라스미드 원형 맵: AmpR, lacZ', MCS, 복제원점(ori)의 원형 배치 및 제한효소 절단 화살표.
-   - 실험 장치 단면도: Blotting(Southern/Northern/Western) 샌드위치 적층 구조(겔, 멤브레인, 여과지, 완충용액, 모세관 이동 방향).
-   - 유전체 지도 축 비교: Genetic Map(cM) <-> Cytological Map(Band) <-> Physical Map(bp/Contig) 연결선.
+★ 3. 생명과학 및 기타 공학 도메인:
+   - 교재 표준 원형 플라스미드 맵, Blotting 적층 장치도, 유전체 지도 축(Genetic-Cytological-Physical) 연결도.
 
-4. 컴퓨터과학/전자공학 (CS & EE):
-   - 메모리 구조도: Stack, Heap, Pointer 주소 매핑 박스 및 데이터 흐름.
-   - 상태 전이 머신(FSM) & 오토마타: 상태 노드 원형 및 조건부 화살표 전이.
-   - 논리 회로 & 파이프라인: 디지털 로직 게이트 및 CPU 파이프라인 타이밍 차트.
-
-[공통 SVG 규격]
-- viewBox="0 0 W H", width="100%", 깔끔한 <defs><marker id="arrow" ...></defs> 필수 사용.
-- 고급스럽고 차분한 색상(#1A202C, #2B6CB0, #319795, #D69E2E, #E53E3E, #718096 등).
+[SVG 공통 기술 규격]
+- viewBox="0 0 600 350", width="100%", 선명한 마커 화살표(<marker id="arrow" ...>) 필수 정의.
+- 선 두께 대비: 주 곡면/축(stroke-width="2"), 보조선/투영선(stroke-width="1" stroke-dasharray="4,3"), 벡터 화살표(stroke-width="1.8").
+- 서체: 수식 라벨은 Times New Roman/이탤릭 계열 폰트로 교재 인쇄물 느낌 완벽 재현.
 
 [본문 구성 및 마크업 규칙]
 1. Mindset 액션 가이드 (<div class="mindset-box">)
@@ -197,7 +197,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  -> [{model_name}] 모델로 분석 및 맞춤형 SVG 시각화 렌더링 시도 중...")
+        print(f"  -> [{model_name}] 모델로 분석 및 전공 표준 Fig SVG 렌더링 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -271,7 +271,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
   
   .svg-container {{ text-align: center; margin: 18px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
-  .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; font-family: 'Pretendard', sans-serif; }}
+  .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
   .caption {{ font-size: 11.5px; color: #4A5568; font-weight: 600; margin-top: 8px; text-align: center; }}
 
   .concept-map {{ display: flex; justify-content: space-between; align-items: stretch; background-color: #F7FAFC; border: 1px solid #CBD5E0; border-radius: 8px; padding: 14px; margin: 16px 0; gap: 10px; }}
