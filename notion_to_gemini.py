@@ -20,6 +20,7 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
+# 우선순위별 모델 폴백 리스트
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
@@ -133,41 +134,52 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     prompt = f"""
-당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 시험 대비 튜터입니다.
-첨부된 전공 문서/손필기 자료를 정밀 분석하여 개념과 시각 자료가 완벽히 결합된 최고급 요약 리포트를 작성해주세요.
-(참고 과목 힌트: {subject_hint}, 참고 단원명 힌트: {unit_hint})
+당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 시각화 튜터입니다.
+첨부된 자료를 심층 분석하여 학문 분야별로 가장 최적화된 고품질 인라인 SVG 도식(최소 3~5개 이상)이 포함된 최고급 A4 요약 리포트를 작성해주세요.
+(참고 과목: {subject_hint}, 단원명: {unit_hint})
 
 [필수 출력 양식 1단계: 제목 생성]
-답변의 첫 번째 줄에 반드시 아래 형식으로 출력하세요:
+답변 첫 줄에 반드시 다음 형식으로 출력:
 DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-[시각화 및 도식(SVG) 최우선 복원 규칙 - 매우 중요]
-첨부 문서/필기 안에 등장하는 모든 핵심 그림, 실험 장치도, 유전자/회로 구조도, 그래프, 매핑 다이어그램을 절대로 텍스트로만 퉁치지 마세요.
-반드시 깨끗하고 미려한 인라인 SVG 코드(<div class="svg-container"><svg ...>...</svg><p class="caption">도식 설명</p></div>)로 4개 이상 직접 그려서 포함하세요.
+[핵심 규칙: 전공 도메인별 맞춤형 SVG 시각화 가이드라인]
+입력된 자료의 학문 분야에 맞추어 아래 규격에 맞는 인라인 SVG(<div class="svg-container"><svg viewBox="0 0 600 350" ...>...</svg><p class="caption">도식 설명</p></div>)를 정밀 코딩하세요:
 
-1. 필수 시각화 도식 타겟 (자료에 등장하는 경우 무조건 SVG로 구현):
-   - [실험 장치 다이어그램]: 예) Southern Blotting 적층 구조 (Glass plate, Gel, Membrane, Paper towels, Weight 등)
-   - [유전자/물리 지도 축 비교 다이어그램]: 예) Genetic map (cM) <-> Cytological map <-> Physical map (kb/Contig) 연결 축
-   - [벡터 및 DNA 구조도]: 예) Plasmid Circular Map (AmpR, lacZ', MCS 위치 및 절단 메커니즘)
-   - [프로세스/메커니즘 흐름도]: 예) Map-based Cloning 단계별 추적 흐름, 전기영동 밴드 패턴 등
+1. 수학/해석학/미적분학 (평가원/수능 수학 시험지 스타일 직교좌표계):
+   - 축 작도: 얇고 날카로운 화살표 마커의 $x, y$ 직교좌표축, 원점 $O$, 축 라벨 ($x, y$ 이탤릭).
+   - 함수 곡선: 부드러운 3차 베지에 곡선(<path d="M... C...">)으로 삼/사차함수, 극값, 변곡점, 점근선 표현.
+   - 특이점/보조선: 극대/극소/교점의 검은 원점(<circle r="3" fill="#000"/>), 접선, 수선의 발 점선(stroke-dasharray="3,3").
+   - 정적분 영역: 둘러싸인 면적의 빗금 패턴(<pattern> 기반의 diagonal hatch).
 
-2. SVG 작성 규격:
-   - viewBox 속성을 지정하여 반응형으로 제작하고, 세련된 색상(#2B6CB0, #319795, #D69E2E, #E53E3E 등)과 가독성 높은 텍스트 라벨을 포함할 것.
-   - 화살표는 <marker> 태그를 이용해 명확히 표현할 것.
+2. 물리학/전자기학/기계 (파인만 물리학 강의 스타일 3D/벡터장):
+   - 3D 폐곡면(Closed Surface): 유려한 베지에 곡선과 입체감을 주는 타원형 경선/위선 점선 호.
+   - 벡터장 & 성분 분해: 면을 관통하는 벡터 화살표들과, 접평면에 수직인 법선 벡터(Normal Component) 및 직교 사영 점선 보조선.
+   - 유선(Streamline) & 폐루프 관(Tube): 와도/순환(Curl/Circulation)을 나타내는 곡선 유선 화살표.
 
-[필기 메모 및 개념 서술 규칙]
-1. 샤프/연필 필기 메모 집중 판독 & 체크 포인트 (<div class="checkpoint-box">):
-   - 노트 여백, 수식/그림 옆에 '#', 체크표시(V, ★), 샤프로 적어둔 메모를 <div class="checkpoint-box"><span class="checkpoint-tag">#체크포인트</span> [원문 코멘트] <span class="tutor-add">(튜터 첨언: [해당 메모와 관련된 엄밀한 보충 설명/수식])</span></div> 형태로 담백하게 구성.
-2. Mindset 액션 가이드 (<div class="mindset-box">) 최상단 배치.
-3. 한 줄 직관 비유 (<div class="analogy-box">).
-4. 개념 대칭/비교 맵 (<div class="concept-map">) 또는 3단계 솔루션 프로세스 (<div class="example-box">).
-5. #함정주의 (<div class="trap-box">) 및 #보이스피싱 (<div class="voice-phishing-box">) 오개념 방지 숏컷.
-6. 최상단 요약 박스 (<div class="summary-box">) 및 최하단 핵심 공식 치트시트 테이블 (<table class="cheat-sheet-table">).
-7. 수식은 모두 LaTeX $...$ 또는 $$...$$로 표기.
-8. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
+3. 생명과학/분자유전학/생화학:
+   - 플라스미드 원형 맵: AmpR, lacZ', MCS, 복제원점(ori)의 원형 배치 및 제한효소 절단 화살표.
+   - 실험 장치 단면도: Blotting(Southern/Northern/Western) 샌드위치 적층 구조(겔, 멤브레인, 여과지, 완충용액, 모세관 이동 방향).
+   - 유전체 지도 축 비교: Genetic Map(cM) <-> Cytological Map(Band) <-> Physical Map(bp/Contig) 연결선.
+
+4. 컴퓨터과학/전자공학 (CS & EE):
+   - 메모리 구조도: Stack, Heap, Pointer 주소 매핑 박스 및 데이터 흐름.
+   - 상태 전이 머신(FSM) & 오토마타: 상태 노드 원형 및 조건부 화살표 전이.
+   - 논리 회로 & 파이프라인: 디지털 로직 게이트 및 CPU 파이프라인 타이밍 차트.
+
+[공통 SVG 규격]
+- viewBox="0 0 W H", width="100%", 깔끔한 <defs><marker id="arrow" ...></defs> 필수 사용.
+- 고급스럽고 차분한 색상(#1A202C, #2B6CB0, #319795, #D69E2E, #E53E3E, #718096 등).
+
+[본문 구성 및 마크업 규칙]
+1. Mindset 액션 가이드 (<div class="mindset-box">)
+2. 한 줄 직관 비유 (<div class="analogy-box">)
+3. 샤프/연필 필기 체크포인트 (<div class="checkpoint-box"><span class="checkpoint-tag">#체크포인트</span> 원문 메모 <span class="tutor-add">(튜터 첨언: ...)</span></div>)
+4. 수식 표기: 모든 수식은 엄밀한 LaTeX $...$ 및 $$...$$ 사용.
+5. 시험 대비 치트시트 테이블 (<table class="cheat-sheet-table">) 최하단 배치.
+6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
 """
     content_payload.append(prompt)
 
@@ -185,7 +197,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  -> [{model_name}] 모델로 분석 및 SVG 시각화 렌더링 시도 중...")
+        print(f"  -> [{model_name}] 모델로 분석 및 맞춤형 SVG 시각화 렌더링 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -235,7 +247,7 @@ def build_full_html(title: str, content_html: str) -> str:
             throwOnError: false
         }});"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
   @page {{ size: A4; margin: 18mm 14mm; }}
   body {{ font-family: 'Pretendard', sans-serif; color: #2D3748; line-height: 1.7; font-size: 13px; margin: 0; }}
   .header-container {{ border-bottom: 2px solid #2B6CB0; padding-bottom: 12px; margin-bottom: 20px; }}
@@ -258,8 +270,8 @@ def build_full_html(title: str, content_html: str) -> str:
 
   .summary-box {{ background-color: #EBF8FF; border-left: 5px solid #3182CE; border-radius: 4px 8px 8px 4px; padding: 14px; margin-bottom: 20px; }}
   
-  .svg-container {{ text-align: center; margin: 16px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
-  .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
+  .svg-container {{ text-align: center; margin: 18px 0; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
+  .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; font-family: 'Pretendard', sans-serif; }}
   .caption {{ font-size: 11.5px; color: #4A5568; font-weight: 600; margin-top: 8px; text-align: center; }}
 
   .concept-map {{ display: flex; justify-content: space-between; align-items: stretch; background-color: #F7FAFC; border: 1px solid #CBD5E0; border-radius: 8px; padding: 14px; margin: 16px 0; gap: 10px; }}
