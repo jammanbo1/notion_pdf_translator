@@ -135,7 +135,7 @@ def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", u
     content_payload = []
     
     prompt_text = """당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 삽화가입니다.
-첨부된 자료를 정밀 분석하여, 표준 전공 교재(Stewart Calculus 9th, Griffiths Electrodynamics, Feynman Lectures)의 Figure와 100% 일치하는 엄밀한 SVG 다이어그램이 포함된 A4 요약 리포트를 작성해주세요.
+첨부된 자료를 정밀 분석하여, 표준 전공 교재(Stewart Calculus 9th, Griffiths Electrodynamics, Feynman Lectures)의 Figure와 100% 일치하는 엄밀한 SVG 다이어그램 및 학습 점검용 실전 예제가 포함된 A4 요약 리포트를 작성해주세요.
 (참고 과목: """ + subject_hint + """, 단원명: """ + unit_hint + """)
 
 [필수 출력 양식 1단계: 제목 생성]
@@ -145,42 +145,48 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-[핵심 규칙: 전공 표준 교재 Figure(도판) 1:1 완벽 정밀 복원]
+★ [매우 중요: 벡터 기호 상단 화살표 표기 절대 규칙]
+1. 모든 벡터는 굵은 볼드체(\\mathbf)를 절대 쓰지 말고, 해당 문자 바로 위에 화살표(\\vec{...})를 그려서 표기할 것!
+   - 예: \\vec{v}, \\vec{E}, \\vec{B}, \\vec{A}, \\vec{F}, \\vec{r}, \\vec{h}, \\vec{\\nabla}
+2. 미소 벡터 변위 및 면적 요소:
+   - d 전체가 아닌 문자 위에만 화살표를 표기할 것: d\\vec{l}, d\\vec{r}, d\\vec{s}, d\\vec{a} = \\hat{n} da, d\\vec{S} = \\hat{n} dS
+   - 예: \\int_C \\vec{F} \\cdot d\\vec{r}, \\quad \\oint \\vec{B} \\cdot d\\vec{l}, \\quad \\iint_S \\vec{E} \\cdot d\\vec{a}
+3. 단위 벡터(Unit Vector)는 윗꺽쇠(\\hat{...})로 통일:
+   - \\hat{n}, \\hat{r}, \\hat{x}, \\hat{y}, \\hat{z}, \\hat{\\theta}, \\hat{\\phi}
+
+[핵심 규칙 1: 전공 표준 교재 Figure(도판) 1:1 완벽 정밀 복원]
 절대로 개념과 무관한 임의의 그림이나 장식용 다이어그램을 그리지 마세요.
-수학/물리 개념이 등장할 경우, 반드시 아래 명시된 '세계 표준 교재의 정식 Figure 구조'를 그대로 SVG(<div class="svg-container"><svg viewBox="0 0 600 350" ...>...</svg><p class="caption">Fig. [교재식 번호 및 설명]</p></div>)로 작도하세요 (최소 3~5개 이상 필수):
+수학/물리/생물 개념이 등장할 경우, 반드시 표준 교재의 정식 Figure 구조를 SVG(<div class="svg-container"><svg viewBox="0 0 600 350" ...>...</svg><p class="caption">Fig. [교재식 번호 및 설명]</p></div>)로 최소 3~5개 이상 작도하세요:
+- Stewart Calculus 규격: 3차원 오른손 좌표계, 등위곡선군 및 수직 그레이디언트 벡터장, 곡면 적분/스토크스 정리 정사영 D.
+- Griffiths/Feynman 규격: 가우스 폐곡면 유선과 법선 분해 성분, 와도 및 폐루프 순환(Circulation), 분리 벡터 삼각도.
+- 생명/공학 규격: 원형 플라스미드 맵, Blotting 적층 장치도, 유전체 지도 축 비교도, 메모리 맵.
 
-★ 1. James Stewart Calculus (Early Transcendentals 9th) 표준 Figure 규격:
-   - 3차원 오른손 좌표계 (x, y, z 축): z축 수직 상향, y축 우측 수평, x축 좌하단 45도 투영 경사축과 원점 O.
-   - 벡터장 & 등위면 (Level Surface / Gradient):
-     * 스칼라 함수 등위곡선군(T=10, 20, 30...)과 각 곡선에 국소적으로 완전 직교(Orthogonal)하는 그레이디언트 벡터장 화살표 다발.
-   - 곡면적 및 선적분 (Surface Integral & Stokes' Theorem):
-     * 3차원 곡면 S, 경계 곡선 C의 양의 방향 회전 화살표, 곡면 위의 미소 면적 패치 dS와 외향 단위 법선 벡터 n.
-     * xy 평면 위의 정사영 영역 D와 점선 투영 보조선.
+[핵심 규칙 2: 최종 학습 점검용 실전 연습 예제 (Practice Problems) 필수 수록]
+본문 마지막 부분(치트시트 직전 또는 직후)에 해당 단원의 핵심 개념을 종합 평가할 수 있는 대표 고난도 실전 예제 1~2개를 반드시 아래 구조로 수록하세요:
 
-★ 2. David J. Griffiths Electrodynamics & Feynman Lectures on Physics 표준 Figure 규격:
-   - 가우스 법칙 (Gauss's Law & Flux):
-     * 임의의 3차원 폐곡면(Closed Surface S)을 통과하는 벡터장선(Streamlines)과 표면 위의 미소 벡터 면적 요소 da.
-     * 표면을 뚫고 나가는 벡터와 외향 법선 벡터 성분, 직교 분해 점선 보조선 및 직각 기호.
-   - 와도 및 순환 (Curl & Circulation):
-     * 벡터장의 소용돌이 유선(Streamlines)과 그 내부를 순환하는 폐회로 루프(Amperian loop), 선적분 미소 변위와 접선 성분.
-   - 정전기학 소스 & 필드:
-     * 원점 O, 소스 위치 벡터 r', 관측점 위치 벡터 r, 분리 벡터(separation vector) 삼각 벡터 결합도.
-
-★ 3. 생명과학 및 기타 공학 도메인:
-   - 교재 표준 원형 플라스미드 맵, Blotting 적층 장치도, 유전체 지도 축 연결도.
-
-[SVG 공통 기술 규격]
-- viewBox="0 0 600 350", width="100%", 선명한 마커 화살표(<marker id="arrow" ...>) 필수 정의.
-- 선 두께 대비: 주 곡면/축(stroke-width="2"), 보조선/투영선(stroke-width="1" stroke-dasharray="4,3"), 벡터 화살표(stroke-width="1.8").
-- 서체: 수식 라벨은 Times New Roman/이탤릭 계열 폰트로 교재 인쇄물 느낌 완벽 재현.
+<div class="practice-box">
+  <div class="practice-header">🎯 [학습 점검] 핵심 개념 실전 적용 예제</div>
+  <div class="practice-question">
+    <strong>[문제]</strong> (실제 대학 중간/기말고사 또는 전공 자격시험 스타일의 정밀한 문제 상황 제시)
+  </div>
+  <div class="practice-solution">
+    <div class="step-label">Step 1. 문제 분석 및 핵심 조건/공식 수립</div>
+    <p>...</p>
+    <div class="step-label">Step 2. 수식 전개 및 단계별 풀이 과정</div>
+    <div class="calc-step">$$ ... $$</div>
+    <div class="step-label">Step 3. 물리적/학문적 의미 해석 및 오답 함정 방어</div>
+    <p>...</p>
+  </div>
+</div>
 
 [본문 구성 및 마크업 규칙]
 1. Mindset 액션 가이드 (<div class="mindset-box">)
 2. 한 줄 직관 비유 (<div class="analogy-box">)
 3. 샤프/연필 필기 체크포인트 (<div class="checkpoint-box"><span class="checkpoint-tag">#체크포인트</span> 원문 메모 <span class="tutor-add">(튜터 첨언: ...)</span></div>)
-4. 수식 표기: 모든 수식은 엄밀한 LaTeX $...$ 및 $$...$$ 사용.
-5. 시험 대비 치트시트 테이블 (<table class="cheat-sheet-table">) 최하단 배치.
-6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
+4. 수식 표기: 모든 수식은 엄밀한 LaTeX $...$ 및 $$...$$ 사용. (벡터는 무조건 \\vec{...})
+5. 최종 학습 점검 실전 예제 (<div class="practice-box">)
+6. 시험 대비 치트시트 테이블 (<table class="cheat-sheet-table">)
+7. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
 """
     content_payload.append(prompt_text)
 
@@ -198,7 +204,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  -> [{model_name}] 모델로 분석 및 전공 표준 Fig SVG 렌더링 시도 중...")
+        print(f"  -> [{model_name}] 모델로 분석, 도판 SVG 및 실전 점검 예제 렌더링 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -275,11 +281,17 @@ def build_full_html(title: str, content_html: str) -> str:
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
   .caption {{ font-size: 11.5px; color: #4A5568; font-weight: 600; margin-top: 8px; text-align: center; }}
 
+  .practice-box {{ background-color: #F8FAFC; border: 1.5px solid #CBD5E0; border-left: 5px solid #4C51BF; border-radius: 4px 8px 8px 4px; padding: 16px; margin: 24px 0; }}
+  .practice-header {{ font-weight: 800; font-size: 14px; color: #3C366B; margin-bottom: 10px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; }}
+  .practice-question {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; margin-bottom: 12px; font-size: 12.5px; line-height: 1.6; }}
+  .practice-solution {{ background-color: #F7FAFC; border-radius: 6px; padding: 10px 12px; font-size: 12px; }}
+  .practice-solution .step-label {{ font-weight: 700; color: #2B6CB0; margin-top: 8px; margin-bottom: 2px; }}
+  .calc-step {{ background-color: #FFFFFF; border: 1px solid #EDF2F7; border-radius: 4px; padding: 8px; margin: 4px 0 8px 0; text-align: center; }}
+
   .concept-map {{ display: flex; justify-content: space-between; align-items: stretch; background-color: #F7FAFC; border: 1px solid #CBD5E0; border-radius: 8px; padding: 14px; margin: 16px 0; gap: 10px; }}
   .map-col {{ flex: 1; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; }}
   .map-header {{ font-weight: 700; font-size: 13px; color: #2B6CB0; margin-bottom: 8px; border-bottom: 1.5px solid #E2E8F0; padding-bottom: 4px; text-align: center; }}
 
-  .example-box {{ background-color: #F7FAFC; border: 1px solid #CBD5E0; border-left: 5px solid #319795; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 18px 0; }}
   .voice-phishing-box {{ background-color: #FAF5FF; border: 1.5px solid #D6BCFA; border-left: 5px solid #805AD5; border-radius: 4px 8px 8px 4px; padding: 14px; margin: 16px 0; }}
   .trap-box {{ background-color: #FFF5F5; border: 1.5px solid #FEB2B2; border-left: 5px solid #E53E3E; border-radius: 4px 8px 8px 4px; padding: 12px 14px; margin: 14px 0; }}
 
