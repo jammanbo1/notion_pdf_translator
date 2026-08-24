@@ -133,8 +133,9 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
+    # 코멘트 스타일을 위한 지시사항 추가
     prompt_text = """당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 편집자입니다.
-첨부된 자료를 정밀 분석하여, 지정된 4대 컬러 체계(빨간색/파란색/초록색/보라색)로 완벽히 통일된 최고급 A4 요약 리포트를 작성해주세요.
+첨부된 자료를 정밀 분석하여, 지정된 컬러 체계(빨간색/파란색/초록색/보라색 및 주황색 코멘트)로 완벽히 통일된 최고급 A4 요약 리포트를 작성해주세요.
 (참고 과목: """ + subject_hint + """, 단원명: """ + unit_hint + """)
 
 [필수 출력 양식 1단계: 제목 생성]
@@ -144,8 +145,8 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [4대 전용 컬러 배정 및 마크업 통일 절대 규칙]
-본문의 모든 박스와 뱃지는 반드시 아래 지정된 4가지 클래스만 사용하세요:
+★ [전용 컬러 배정 및 마크업 통일 절대 규칙]
+본문의 모든 박스와 뱃지, 코멘트는 반드시 아래 지정된 클래스만 사용하세요:
 
 1. 빨간색 (Red) -> [중요], [체크포인트], 핵심 공식/유도:
    - <div class="note-box note-red"><span class="badge badge-red">중요</span> ...</div>
@@ -174,6 +175,12 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
        <div class="step-label">Step 3. 결과 해석 및 함정 방어</div>
        <p>...</p>
      </div>
+   </div>
+
+5. 주황색 (Orange) -> [코멘트], [참고], [주의]:
+   - 본문 내용 중 보충 설명이 필요한 부분 옆이나 아래에 배치하세요.
+   <div class="comment-box">
+     <span class="badge badge-orange">코멘트</span> (보충 설명, 오개념 주의, 또는 교수님 강조 사항 등)
    </div>
 
 ★ [벡터 및 수식 표기 절대 통일 규칙]
@@ -208,7 +215,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  -> [{model_name}] 모델로 분석 및 4대 컬러 테마 렌더링 시도 중...")
+        print(f"  -> [{model_name}] 모델로 분석 및 리포트 렌더링 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -303,7 +310,7 @@ def build_full_html(title: str, content_html: str) -> str:
     margin-bottom: 8px;
   }}
 
-  /* 4대 컬러 전용 뱃지 (Badge) 시스템 */
+  /* 뱃지 (Badge) 시스템 */
   .badge {{
     display: inline-block;
     font-size: 11px;
@@ -322,8 +329,10 @@ def build_full_html(title: str, content_html: str) -> str:
   .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
   /* 4. 보라색: 실전 점검, 예제 */
   .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
+  /* 5. 주황색: 코멘트 전용 */
+  .badge-orange {{ background-color: #FFF7ED; color: #EA580C; border: 1px solid #FFEDD5; }}
 
-  /* 4대 컬러 모던 노트 박스 */
+  /* 모던 노트 박스 */
   .note-box {{
     background-color: #FFFFFF;
     border: 1px solid #E2E8F0;
@@ -338,6 +347,19 @@ def build_full_html(title: str, content_html: str) -> str:
   .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
   .note-purple {{ border-left: 4px solid #7C3AED; background-color: #FAF5FF0D; }}
 
+  /* 코멘트 박스 스타일 추가 (주황색 테마) */
+  .comment-box {{
+    background-color: #FFF7ED;
+    border: 1px solid #FFEDD5;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 10px 0;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #9A3412;
+    font-style: italic;
+  }}
+
   /* SVG 다이어그램 컨테이너 */
   .svg-container {{ 
     text-align: center; 
@@ -351,7 +373,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
   .caption {{ font-size: 11.5px; color: #64748B; font-weight: 600; margin-top: 8px; text-align: center; }}
 
-  /* 학습 점검 실전 예제 (Practice Box) - 보라색 테마 */
+  /* 학습 점검 실전 예제 (Practice Box) */
   .practice-box {{ 
     background-color: #FFFFFF; 
     border: 1px solid #E9D5FF; 
