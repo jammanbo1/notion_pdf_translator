@@ -22,9 +22,9 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 # 3.6 모델 실패/쿼터 소진 시 3.7 및 하위/경량 모델 순차 호출
 FALLBACK_MODELS = [
+    "gemini-3.5-flash",
     "gemini-3.6-flash",
     "gemini-3.7-flash",
-    "gemini-3.5-flash",
     "gemini-3.5-flash-lite"
 ]
 
