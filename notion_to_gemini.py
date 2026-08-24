@@ -20,6 +20,7 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
+# 우선순위별 모델 폴백 리스트
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
@@ -132,10 +133,10 @@ def find_supported_attachments(page):
 
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
-    prompt = f"""
-당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 삽화가입니다.
+    
+    prompt_text = """당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 삽화가입니다.
 첨부된 자료를 정밀 분석하여, 표준 전공 교재(Stewart Calculus 9th, Griffiths Electrodynamics, Feynman Lectures)의 Figure와 100% 일치하는 엄밀한 SVG 다이어그램이 포함된 A4 요약 리포트를 작성해주세요.
-(참고 과목: {subject_hint}, 단원명: {unit_hint})
+(참고 과목: """ + subject_hint + """, 단원명: """ + unit_hint + """)
 
 [필수 출력 양식 1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
@@ -149,24 +150,24 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 수학/물리 개념이 등장할 경우, 반드시 아래 명시된 '세계 표준 교재의 정식 Figure 구조'를 그대로 SVG(<div class="svg-container"><svg viewBox="0 0 600 350" ...>...</svg><p class="caption">Fig. [교재식 번호 및 설명]</p></div>)로 작도하세요 (최소 3~5개 이상 필수):
 
 ★ 1. James Stewart Calculus (Early Transcendentals 9th) 표준 Figure 규격:
-   - 3차원 오른손 좌표계 ($x, y, z$ 축): $z$축 수직 상향, $y$축 우측 수평, $x$축 좌하단 45도 투영 경사축과 원점 $O$.
+   - 3차원 오른손 좌표계 (x, y, z 축): z축 수직 상향, y축 우측 수평, x축 좌하단 45도 투영 경사축과 원점 O.
    - 벡터장 & 등위면 (Level Surface / Gradient):
-     * 스칼라 함수 등위곡선군($T=10^\circ, 20^\circ, 30^\circ, \dots$)과 각 곡선에 국소적으로 완전 직교(Orthogonal)하는 그레이디언트 벡터장 $\nabla f$ (또는 열유속 $\vec{h}=-k\nabla T$) 화살표 다발.
+     * 스칼라 함수 등위곡선군(T=10, 20, 30...)과 각 곡선에 국소적으로 완전 직교(Orthogonal)하는 그레이디언트 벡터장 화살표 다발.
    - 곡면적 및 선적분 (Surface Integral & Stokes' Theorem):
-     * 3차원 곡면 $S$, 경계 곡선 $C=\partial S$의 양의 방향(Right-hand rule 회전 화살표), 곡면 위의 미소 면적 패치 $dS$와 외향 단위 법선 벡터 $\vec{n}$.
-     * $xy$ 평면 위의 정사영 영역 $D$와 점선 투영 보조선.
+     * 3차원 곡면 S, 경계 곡선 C의 양의 방향 회전 화살표, 곡면 위의 미소 면적 패치 dS와 외향 단위 법선 벡터 n.
+     * xy 평면 위의 정사영 영역 D와 점선 투영 보조선.
 
 ★ 2. David J. Griffiths Electrodynamics & Feynman Lectures on Physics 표준 Figure 규격:
    - 가우스 법칙 (Gauss's Law & Flux):
-     * 임의의 3차원 폐곡면(Closed Surface $S$)을 통과하는 벡터장선(Streamlines)과 표면 위의 미소 벡터 면적 요소 $d\vec{a} = \hat{n} da$.
-     * 표면을 뚫고 나가는 벡터 $\vec{v}$ (또는 $\vec{E}$)와 외향 법선 벡터 성분($v_\perp = \vec{v}\cdot\hat{n}$), 직교 분해 점선 보조선 및 직각 기호.
+     * 임의의 3차원 폐곡면(Closed Surface S)을 통과하는 벡터장선(Streamlines)과 표면 위의 미소 벡터 면적 요소 da.
+     * 표면을 뚫고 나가는 벡터와 외향 법선 벡터 성분, 직교 분해 점선 보조선 및 직각 기호.
    - 와도 및 순환 (Curl & Circulation):
-     * 벡터장의 소용돌이 유선(Streamlines)과 그 내부를 순환하는 폐회로 루프(Amperian tube / loop), 선적분 미소 변위 $d\vec{l}$과 접선 성분 $v_\parallel$.
+     * 벡터장의 소용돌이 유선(Streamlines)과 그 내부를 순환하는 폐회로 루프(Amperian loop), 선적분 미소 변위와 접선 성분.
    - 정전기학 소스 & 필드:
-     * 원점 $O$, 소스 위치 벡터 $\vec{r}'$, 관측점 위치 벡터 $\vec{r}$, 분리 벡터 $\vec{\boldsymbol{\imath}} = \vec{r} - \vec{r}'$ 삼각 벡터 결합도.
+     * 원점 O, 소스 위치 벡터 r', 관측점 위치 벡터 r, 분리 벡터(separation vector) 삼각 벡터 결합도.
 
 ★ 3. 생명과학 및 기타 공학 도메인:
-   - 교재 표준 원형 플라스미드 맵, Blotting 적층 장치도, 유전체 지도 축(Genetic-Cytological-Physical) 연결도.
+   - 교재 표준 원형 플라스미드 맵, Blotting 적층 장치도, 유전체 지도 축 연결도.
 
 [SVG 공통 기술 규격]
 - viewBox="0 0 600 350", width="100%", 선명한 마커 화살표(<marker id="arrow" ...>) 필수 정의.
@@ -181,7 +182,7 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 5. 시험 대비 치트시트 테이블 (<table class="cheat-sheet-table">) 최하단 배치.
 6. 별도의 <html>, <head>, <body> 태그 없이 <div>로 감싼 순수 HTML 본문만 반환할 것.
 """
-    content_payload.append(prompt)
+    content_payload.append(prompt_text)
 
     for item in file_list:
         res = requests.get(item["url"], stream=True, timeout=120)
