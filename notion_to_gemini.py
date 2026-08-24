@@ -20,7 +20,6 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 3.6 모델 실패/쿼터 소진 시 3.7 및 하위/경량 모델 순차 호출
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
@@ -135,6 +134,7 @@ def find_supported_attachments(page):
 def extract_and_design_multiple_files(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
+    # 코멘트 스타일을 위한 지시사항 추가
     prompt_text = """당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 편집자입니다.
 첨부된 자료를 정밀 분석하여, 지정된 컬러 체계(빨간색/파란색/초록색/보라색 및 주황색 코멘트)로 완벽히 통일된 최고급 A4 요약 리포트를 작성해주세요.
 (참고 과목: """ + subject_hint + """, 단원명: """ + unit_hint + """)
@@ -300,7 +300,7 @@ def build_full_html(title: str, content_html: str) -> str:
     border-left: 3.5px solid #2563EB; 
     padding-left: 9px; 
     margin-top: 26px; 
-    margin-bottom: 12px; 
+    margin-bottom: 12px;
     letter-spacing: -0.3px;
   }}
   h3 {{ 
@@ -308,7 +308,7 @@ def build_full_html(title: str, content_html: str) -> str:
     font-weight: 700; 
     color: #334155; 
     margin-top: 18px; 
-    margin-bottom: 8px; 
+    margin-bottom: 8px;
   }}
 
   /* 뱃지 (Badge) 시스템 */
@@ -322,10 +322,15 @@ def build_full_html(title: str, content_html: str) -> str:
     letter-spacing: -0.2px;
     vertical-align: middle;
   }}
+  /* 1. 빨간색: 중요, 체크포인트, 공식 */
   .badge-red {{ background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }}
+  /* 2. 파란색: 개념, 학습 목표 */
   .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
+  /* 3. 초록색: 직관 비유, 팁 */
   .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
+  /* 4. 보라색: 실전 점검, 예제 */
   .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
+  /* 5. 주황색: 코멘트 전용 */
   .badge-orange {{ background-color: #FFF7ED; color: #EA580C; border: 1px solid #FFEDD5; }}
 
   /* 모던 노트 박스 */
@@ -343,7 +348,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
   .note-purple {{ border-left: 4px solid #7C3AED; background-color: #FAF5FF0D; }}
 
-  /* 코멘트 박스 스타일 */
+  /* 코멘트 박스 스타일 추가 (주황색 테마) */
   .comment-box {{
     background-color: #FFF7ED;
     border: 1px solid #FFEDD5;
@@ -369,7 +374,7 @@ def build_full_html(title: str, content_html: str) -> str:
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
   .caption {{ font-size: 11.5px; color: #64748B; font-weight: 600; margin-top: 8px; text-align: center; }}
 
-  /* 학습 점검 실전 예제 */
+  /* 학습 점검 실전 예제 (Practice Box) */
   .practice-box {{ 
     background-color: #FFFFFF; 
     border: 1px solid #E9D5FF; 
