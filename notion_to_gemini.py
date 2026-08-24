@@ -98,7 +98,7 @@ def get_unprocessed_items():
     unprocessed = []
     for page in results:
         props = page.get("properties", {})
-        # '내용 요약본' 컬럼이 비어있는 항목만 필터링
+        # '내용 요약본' 컬럼이 비어있는 항목만 필터링 (중복 처리 방지)
         text_link_prop = props.get("내용 요약본", {})
         existing_url = text_link_prop.get("url") if text_link_prop.get("type") == "url" else None
 
@@ -130,14 +130,17 @@ def extract_and_design_theory(file_list: list, subject_hint: str = "", unit_hint
     content_payload = []
     
     prompt_text = f"""당신은 세계 최고 수준의 이공계열 전공 학업 요약 전문가이자 공식 전공서 편집자입니다.
-첨부된 자료를 정밀 분석하여, 지정된 컬러 체계로 통일된 최고급 A4 [내용 요약본] 리포트를 작성해주세요.
+첨부된 자료를 정밀 분석하여, [심층 개념/수식 + 실제 예제 풀이 + 손글씨 필기 코멘트]가 완벽히 융합된 최고급 A4 [내용 요약본] 리포트를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
 
-★ [핵심 지침]: SVG 코드를 직접 그리지 마세요. 모든 토큰을 개념의 엄밀한 정의, 깊이 있는 설명, 단계별 수식 유도, 실전 예제에 100% 집중하세요!
+★ [핵심 지침]: 
+1. SVG 코드는 절대 작성하지 마세요. (도판은 별도 생성됨)
+2. 첨부 자료의 **여백, 행간, 그림 옆에 샤프나 펜으로 적힌 손글씨 메모/코멘트/별표/주의사항을 정밀 판독**하여 본문에 적극 반영하세요.
+3. 남은 모든 출력 토큰을 ① 개념 정의, ② 단계별 수식 유도, ③ 실전 예제 풀이, ④ 필기 코멘트 반영에 100% 집중하세요!
 
 [필수 출력 양식 1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
-DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 이론 및 수식 유도 요약
+DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 이론 및 실전 예제 심층 해설
 
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
@@ -156,29 +159,31 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 이론 및 수식 유도 요약
 3. 초록색 (Green) -> [직관 비유], [해석 팁]:
    - <div class="note-box note-green"><span class="badge badge-green">직관 비유</span> ...</div>
 
-4. 보라색 (Purple) -> [학습 점검], [실전 예제]:
+4. 보라색 (Purple) -> [첨부 자료 기반 실전 문제 / 예제 심층 해설]:
+   ※ 첨부 자료에 수록된 대표 예제, 연습문제, 필기 문제를 우선적으로 발췌하여 해설하세요. (만약 문제/예제가 전혀 없다면 해당 단원 최빈출 전공 기출 변형 문제를 다룰 것)
    <div class="practice-box">
-     <div class="practice-header"><span class="badge badge-purple">학습 점검</span> 실전 기출/적용 예제</div>
+     <div class="practice-header"><span class="badge badge-purple">실전 예제 풀이</span> (문제 상황 명시)</div>
      <div class="practice-question">
-       <strong>[문제]</strong> (상황 제시 및 질문)
+       <strong>[문제 상황]</strong> (문제 조건 및 물리적 상황 서술)
      </div>
      <div class="practice-solution">
-       <div class="step-label">Step 1. 문제 모델링 및 핵심 공식 수립</div>
-       <p>...</p>
-       <div class="step-label">Step 2. 수식 전개 과정</div>
+       <div class="step-label">Step 1. 물리적 대칭성 및 경계 조건(Boundary Condition) 분석</div>
+       <p>(적용 원리 및 가정 설명)</p>
+       <div class="step-label">Step 2. 단계별 엄밀한 수식 유도 및 계산</div>
        <div class="calc-step">$$ ... $$</div>
        <div class="step-label">Step 3. 결과 해석 및 함정 방어</div>
-       <p>...</p>
+       <p>(물리적 의미 및 감점 방지 팁)</p>
      </div>
    </div>
 
-5. 주황색 (Orange) -> [코멘트], [참고], [주의]:
+5. 주황색 (Orange) -> [손글씨 필기 코멘트], [교수님 강조], [오개념 주의]:
+   ※ 자료 여백/행간에 샤프로 적힌 메모, 개인적 의문점 해결, 팁은 반드시 이 박스로 살려내세요!
    <div class="comment-box">
-     <span class="badge badge-orange">코멘트</span> (보충 설명, 오개념 주의, 또는 강조 사항)
+     <span class="badge badge-orange">필기 코멘트</span> (샤프로 적힌 핵심 팁, 오개념 주의, 또는 수업 강조 사항)
    </div>
 
 ★ [벡터 및 수식 표기 절대 통일 규칙]
-1. 모든 벡터는 볼드체(\\mathbf)를 일절 쓰지 말고, 기호 위에 화살표(\\vec{{...}})를 붙여 일관되게 표기할 것! (예: \\vec{{v}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{F}}, \\vec{{r}}, \\vec{{\\nabla}})
+1. 모든 벡터는 볼드체(\\mathbf) 절대 금지, 기호 위에 화살표(\\vec{{...}}) 표기 준수 (예: \\vec{{v}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{F}}, \\vec{{r}}, \\vec{{\\nabla}})
 2. 미소 벡터 요소: d\\vec{{l}}, d\\vec{{r}}, d\\vec{{s}}, d\\vec{{a}} = \\hat{{n}} da, d\\vec{{S}} = \\hat{{n}} dS
 3. 단위 벡터: 윗꺽쇠 표기 (\\hat{{n}}, \\hat{{r}}, \\hat{{x}}, \\hat{{y}}, \\hat{{z}})
 
@@ -405,7 +410,7 @@ def build_full_html(title: str, content_html: str) -> str:
 <body>
   <div class="header-container">
     <h1 class="doc-title">{title}</h1>
-    <p class="doc-subtitle">핵심 이론 및 심층 수식 요약 리포트</p>
+    <p class="doc-subtitle">핵심 이론 및 실전 예제 요약 리포트</p>
   </div>
   {clean_html}
 </body>
