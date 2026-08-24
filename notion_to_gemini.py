@@ -20,11 +20,10 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
-# --- 이전 코드의 모델 설정을 그대로 유지 ---
 FALLBACK_MODELS = [
     "gemini-3.5-flash",
     "gemini-3.6-flash",
-    "gemini-3.5-flash-lite"
+    "gemini-3.5-flash-lite",
 ]
 
 
@@ -42,7 +41,7 @@ def get_or_create_release(tag="pdf-reports"):
     payload = {
         "tag_name": tag,
         "name": "Generated PDF Reports",
-        "body": "자동 생성된 PDF 정리본 보관소입니다.",
+        "body": "자동 생성된 PDF 전공 요약 리포트 보관소입니다.",
         "draft": False,
         "prerelease": False,
     }
@@ -145,31 +144,66 @@ DOC_TITLE: [과목/단원 핵심 키워드 중심의 명확한 리포트 제목]
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요. (코드블록 백틱 ```html 은 생략하거나 감싸도 무방)
 
-★ [본문 수식 표기 및 벡터 규격 (HTML KaTeX 렌더링)]
-- 화살표 뭉개짐을 방지하기 위해 모든 벡터는 \\vec{{...}} 또는 \\overrightarrow{{...}}를 사용할 것! (예: \\vec{{F}}, \\vec{{r}}, \\vec{{E}}, \\vec{{B}}, \\vec{{v}})
-- 단위 벡터는 윗꺽쇠 표기: \\hat{{n}}, \\hat{{r}}, \\hat{{i}}, \\hat{{j}}, \\hat{{k}}
-- 미소 벡터 요소: d\\vec{{r}}, d\\vec{{l}}, d\\vec{{S}} = \\hat{{n}} dS
+★ [본문 텍스트 절대 규칙: 한자 사용 금지]
+본문의 모든 설명 텍스트, 제목, 뱃지, 노트 박스 내부 등 답변 전체에서 한자(漢字)를 절대로 사용하지 마세요. 모든 한자 용어는 한글 전용 표기로 바꾸거나 쉬운 한글 표현으로 수정하여 작성해야 합니다. (예: 恒等式 -> 항등식, 誘導 -> 유도, 磁氣場 -> 자기장)
 
-★ [SVG 그래픽 도판 작도 및 표기 규칙 (수식 깨짐 방지 핵심)]
-1. 모든 SVG 내부 수식/라벨 표기:
-   - SVG 내부 <text> 태그 안에서 $\\vec{{F}}$ 같은 KaTeX 소스 코드나 유니코드 결합 문자를 절대 사용하지 말 것! PDF 렌더링 시 깨짐.
-   - **글로벌 대학 교재 표준 볼드 이탤릭체(Bold Italic)**로 작성할 것! 폰트 어긋남 0%.
-   - 벡터량: <tspan font-style="italic" font-weight="bold">F</tspan>, <tspan font-style="italic" font-weight="bold">r</tspan>, <tspan font-style="italic" font-weight="bold">E</tspan>
-   - 단위 벡터: <tspan font-style="italic" font-weight="bold">n̂</tspan>, <tspan font-style="italic" font-weight="bold">r̂</tspan>
-   - 스칼라/좌표: 이탤릭 (<tspan font-style="italic">x</tspan>, <tspan font-style="italic">y</tspan>, <tspan font-style="italic">z</tspan>)
+★ [4대 전용 컬러 배정 및 마크업 통일 규칙]
+본문의 모든 박스와 뱃지는 반드시 아래 지정된 4가지 클래스만 사용하세요:
+1. 빨간색 (Red) -> [중요], [체크포인트], 핵심 공식 유도:
+   - <div class="note-box note-red"><span class="badge badge-red">중요</span> ...</div>
+   - <div class="note-box note-red"><span class="badge badge-red">핵심 공식 유도</span> ...</div>
+2. 파란색 (Blue) -> [핵심 개념], [학습 목표]:
+   - <div class="note-box note-blue"><span class="badge badge-blue">학습 목표</span> ...</div>
+   - <div class="note-box note-blue"><span class="badge badge-blue">핵심 개념</span> ...</div>
+3. 초록색 (Green) -> [직관 비유], [해석 팁]:
+   - <div class="note-box note-green"><span class="badge badge-green">직관 비유</span> ...</div>
+4. 보라색 (Purple) -> [학습 점검], [실전 예제]:
+   <div class="practice-box">
+     <div class="practice-header"><span class="badge badge-purple">학습 점검</span> 실전 기출/적용 예제</div>
+     <div class="practice-question"><strong>[문제]</strong> (상황 제시 및 질문)</div>
+     <div class="practice-solution">
+       <div class="step-label">Step 1. 문제 모델링 및 핵심 공식 수립</div>
+       <p>...</p>
+       <div class="step-label">Step 2. 수식 전개 과정</div>
+       <div class="calc-step">$$ ... $$</div>
+       <div class="step-label">Step 3. 결과 해석 및 함정 방어</div>
+       <p>...</p>
+     </div>
+   </div>
 
-2. 기하학적 엄밀성 (Mathematical Rigor):
-   - 스타일 테마: 깔끔한 **모노크롬(흑백) 출판 스타일**(`#0f172a`, 배경 `#f8fafc`, 점선 `#94a3b8`).
-   - 모든 경로(path)는 원점과 스케일을 정하고 **실제 함수 수식 수치 샘플링(Numerical Sampling)**을 기반으로 생성할 것. 제어점 임의 추정 금지.
-   - 닫힌 곡선/곡면 작도 시 모서리 꺾임(Cusp)이 없도록 **접선 벡터가 연속인 $C^1$ 매끄러운 스무딩** 적용.
+★ [수식 표기 및 벡터 규격 (절대 규칙)]
+1. 본문 HTML/LaTeX 수식 (PDF 렌더링):
+   - 화살표 뭉개짐을 방지하기 위해 모든 벡터는 \\vec{{...}} 또는 \\overrightarrow{{...}}를 사용할 것! (예: \\vec{{F}}, \\vec{{r}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{v}})
+   - 단위 벡터는 윗꺽쇠 표기: \\hat{{n}}, \\hat{{r}}, \\hat{{i}}, \\hat{{j}}, \\hat{{k}}, \\hat{{\\phi}}, \\hat{{\\theta}}
+   - 미소 벡터 요소: d\\vec{{r}}, d\\vec{{l}}, d\\vec{{S}} = \\hat{{n}} dS
+2. SVG 그래픽 도판 내부 수식/라벨 (SVG 표준):
+   - SVG 내부에서는 폰트 렌더링 오차 및 글자 어긋남을 원천 방지하기 위해, 화살표 오버레이 대신 **글로벌 대학 교재 표준 볼드 이탤릭체(Bold Italic)**로 작성할 것!
+   - 벡터량: <tspan font-style="italic" font-weight="bold">F</tspan>, <tspan font-style="italic" font-weight="bold">r</tspan>, <tspan font-style="italic" font-weight="bold">E</tspan>, <tspan font-style="italic" font-weight="bold">B</tspan>, <tspan font-style="italic" font-weight="bold">A</tspan>, <tspan font-style="italic" font-weight="bold">I</tspan>, d<tspan font-style="italic" font-weight="bold">l</tspan>
+   - 단위 벡터: <tspan font-style="italic" font-weight="bold">n̂</tspan>, <tspan font-style="italic" font-weight="bold">r̂</tspan>, <tspan font-style="italic" font-weight="bold">ϕ̂</tspan>
+   - 스칼라/좌표/주기: <tspan font-style="italic">x</tspan>, <tspan font-style="italic">y</tspan>, <tspan font-style="italic">z</tspan>, <tspan font-style="italic">t</tspan>, <tspan font-style="italic">T</tspan>, <tspan font-style="italic">r</tspan>, <tspan font-style="italic">R</tspan>, <tspan font-style="italic">θ</tspan>
 
-★ [마크업 및 테이블 규격]
-- 모든 SVG는 <div class="svg-container"><svg ...>...</svg><p class="caption">그림 X. 설명</p></div> 형식으로 작성. 최소 3~4개 필수 삽입.
-- 최하단에 <table class="cheat-sheet-table">로 핵심 공식 및 정리를 성질별로 집대성할 것.
+★ [전공 표준 SVG 그래픽 도판 작도 절대 규칙 (단원별 핵심 개념마다 최소 2~4개 필수 삽입)]
+- 모든 SVG는 반드시 아래 구조로 감싸서 작성:
+  <div class="svg-container">
+    <svg viewBox="0 0 520 360" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" style="background-color: #f8fafc; font-family: 'Pretendard', sans-serif;">
+      <!-- 다이어그램 내용 -->
+    </svg>
+    <p class="caption">그림 X. [도해에 대한 명확한 한글 캡션]</p>
+  </div>
+- 스타일 테마: 불필요한 화려한 원색을 배제하고, 깔끔한 **모노크롬(흑백) 출판 스타일**(`#0f172a`, 배경 `#f8fafc`, 점선/보조선 `#94a3b8`, 텍스트 `#475569`) 준수.
+- 기하학적 엄밀성 (Mathematical Rigor):
+  * 임의의 제어점 추정 금지. 원점 $O(x_0, y_0)$과 스케일을 정하고 **실제 함수 수식 수치 샘플링(Numerical Sampling)**을 기반으로 경로(path/line)를 생성할 것.
+  * 닫힌 곡선/곡면 및 도선 작도 시 모서리 꺾임(Cusp)이 없도록 **접선 벡터가 연속인 $C^1$ 매끄러운 스무딩** 적용.
+  * 2차원 함수 그래프: 점근선, 평균선, 특이점(극대/극소/절편)은 수선 점선(`stroke-dasharray="4 3"`)과 좌표 틱(Tick)을 정확히 일치시키고, 주기 구간 치수선(양방향 화살표)을 명확히 표기할 것.
+  * 2차원 벡터장: 정방형 뷰박스(`viewBox="0 0 520 520"`) 내에서 격자 샘플링 기반으로 화살표 방향과 크기를 비례적으로 정밀 배치할 것.
+  * 3차원 입체 도판: 타원 투시(Perspective Squashing)를 적용하고, 은면 윤곽 점선과 외향 단위 법선 벡터(n̂), 폐경로(C), 미소 체적/면적 요소(dV, dS)를 정밀하게 묘사할 것.
+  * 도판 내 한자(漢字) 사용은 절대 금지.
+
+★ [시험 대비 종합 치트시트 테이블]
+최하단에 <table class="cheat-sheet-table">로 핵심 공식, 물리적/수학적 의미, 주요 기하학적 정리를 표로 집대성할 것. (한자 사용 절대 금지)
 """
     content_payload.append(prompt_text)
 
-    # --- 이전 코드의 requests 사용 방식을 유지 ---
     for item in file_list:
         res = requests.get(item["url"], stream=True, timeout=120)
         res.raise_for_status()
@@ -218,7 +252,6 @@ def build_full_html(title: str, content_html: str) -> str:
         r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE
     )
 
-    # --- KaTeX 설정 보완: 화살표 매크로 설정을 강제하여 유지 ---
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -242,7 +275,7 @@ def build_full_html(title: str, content_html: str) -> str:
   @import url('[https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap](https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap)');
   @page {{ size: A4; margin: 18mm 14mm; }}
   body {{ 
-    font-family: 'Pretendard', sans-serif; 
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; 
     color: #1E293B; 
     line-height: 1.75; 
     font-size: 13px; 
@@ -284,14 +317,32 @@ def build_full_html(title: str, content_html: str) -> str:
     margin-bottom: 8px; 
   }}
 
-  /* 뱃지 및 노트 박스 시스템 */
-  .badge {{ display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin-right: 6px; letter-spacing: -0.2px; vertical-align: middle; }}
+  /* 4대 컬러 전용 뱃지 (Badge) 시스템 */
+  .badge {{
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-right: 6px;
+    letter-spacing: -0.2px;
+    vertical-align: middle;
+  }}
   .badge-red {{ background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }}
   .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
   .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
   .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
 
-  .note-box {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px 14px; margin: 12px 0; font-size: 12.5px; line-height: 1.65; }}
+  /* 4대 컬러 모던 노트 박스 */
+  .note-box {{
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    font-size: 12.5px;
+    line-height: 1.65;
+  }}
   .note-red {{ border-left: 4px solid #DC2626; background-color: #FEF2F20D; }}
   .note-blue {{ border-left: 4px solid #2563EB; background-color: #EFF6FF0D; }}
   .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
@@ -310,17 +361,74 @@ def build_full_html(title: str, content_html: str) -> str:
   .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
   .caption {{ font-size: 11.5px; color: #64748B; font-weight: 600; margin-top: 8px; text-align: center; }}
 
-  /* 학습 점검 실전 예제 (Practice Box) */
-  .practice-box {{ background-color: #FFFFFF; border: 1px solid #E9D5FF; border-left: 4px solid #7C3AED; border-radius: 6px; padding: 15px; margin: 24px 0; }}
-  .practice-header {{ font-weight: 700; font-size: 13.5px; color: #5B21B6; margin-bottom: 10px; border-bottom: 1px solid #F3E8FF; padding-bottom: 6px; }}
-  .practice-question {{ background-color: #FAF5FF; border: 1px solid #F3E8FF; border-radius: 4px; padding: 11px; margin-bottom: 10px; font-size: 12.5px; line-height: 1.6; }}
-  .practice-solution {{ background-color: #FFFFFF; padding: 6px 4px; font-size: 12px; }}
-  .calc-step {{ background-color: #FAF5FF; border: 1px solid #F3E8FF; border-radius: 4px; padding: 8px; margin: 4px 0 8px 0; text-align: center; }}
+  /* 학습 점검 실전 예제 (Practice Box) - 보라색 테마 */
+  .practice-box {{ 
+    background-color: #FFFFFF; 
+    border: 1px solid #E9D5FF; 
+    border-left: 4px solid #7C3AED; 
+    border-radius: 6px; 
+    padding: 15px; 
+    margin: 24px 0; 
+  }}
+  .practice-header {{ 
+    font-weight: 700; 
+    font-size: 13.5px; 
+    color: #5B21B6; 
+    margin-bottom: 10px; 
+    border-bottom: 1px solid #F3E8FF; 
+    padding-bottom: 6px; 
+  }}
+  .practice-question {{ 
+    background-color: #FAF5FF; 
+    border: 1px solid #F3E8FF; 
+    border-radius: 4px; 
+    padding: 11px; 
+    margin-bottom: 10px; 
+    font-size: 12.5px; 
+    line-height: 1.6; 
+  }}
+  .practice-solution {{ 
+    background-color: #FFFFFF; 
+    padding: 6px 4px; 
+    font-size: 12px; 
+  }}
+  .practice-solution .step-label {{ 
+    font-weight: 700; 
+    color: #7C3AED; 
+    margin-top: 8px; 
+    margin-bottom: 2px; 
+  }}
+  .calc-step {{ 
+    background-color: #FAF5FF; 
+    border: 1px solid #F3E8FF; 
+    border-radius: 4px; 
+    padding: 8px; 
+    margin: 4px 0 8px 0; 
+    text-align: center; 
+  }}
 
   /* 치트시트 테이블 */
-  .cheat-sheet-table {{ width: 100%; border-collapse: collapse; margin: 20px 0 10px 0; font-size: 12px; }}
-  .cheat-sheet-table th {{ background-color: #0F172A; color: #FFFFFF; font-weight: 600; padding: 8px 10px; border: 1px solid #334155; text-align: center; }}
-  .cheat-sheet-table td {{ border: 1px solid #E2E8F0; padding: 8px 10px; text-align: center; background-color: #FFFFFF; }}
+  .cheat-sheet-table {{ 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 20px 0 10px 0; 
+    font-size: 12px; 
+  }}
+  .cheat-sheet-table th {{ 
+    background-color: #0F172A; 
+    color: #FFFFFF; 
+    font-weight: 600; 
+    padding: 8px 10px; 
+    border: 1px solid #334155; 
+    text-align: center; 
+  }}
+  .cheat-sheet-table td {{ 
+    border: 1px solid #E2E8F0; 
+    padding: 8px 10px; 
+    text-align: center; 
+    background-color: #FFFFFF; 
+  }}
+  .cheat-sheet-table tr:nth-child(even) td {{ background-color: #F8FAFC; }}
 </style>
 </head>
 <body>
@@ -404,7 +512,6 @@ def main():
             print(f"분석 시작 (과목: '{subject_hint}', 단원명: '{unit_hint}', 첨부파일 {len(files)}개)...")
 
             try:
-                # 제미나이 모델이 SVG 내부 수식을 그리지 않고 텍스트/표로만 요약하도록 프롬프트가 보완됨
                 doc_title, body_html = extract_and_design_multiple_files(files, subject_hint, unit_hint)
                 
                 safe_title = sanitize_filename(doc_title)
@@ -414,7 +521,7 @@ def main():
                 temp_pdf_path = os.path.join(temp_dir, f"{safe_title}.pdf")
                 render_html_to_pdf(full_html, temp_pdf_path)
 
-                print("  -> GitHub Storage에 업로드 중...")
+                print("  -> GitHub Release에 업로드 중...")
                 pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{safe_title}.pdf")
                 print(f"  -> 다운로드 링크: {pdf_url}")
 
