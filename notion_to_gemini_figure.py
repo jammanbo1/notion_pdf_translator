@@ -22,10 +22,10 @@ notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
 FALLBACK_MODELS = [
-    "gemini-3.5-flash-lite",
     "gemini-3.6-flash",
-    "gemini-3.7-flash",
+    "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
+    "gemini-3.7-flash",
 ]
 
 
@@ -137,18 +137,17 @@ def plan_figures_with_gemini(raw_file_payload: list, subject_hint: str, unit_hin
 ★ 절대 규칙:
 1. 도판 개수는 무조건 [가장 중요한 2개]만 선정하세요.
 2. SVG 코드나 HTML 태그는 일절 작성하지 마세요. (순수 기획 데이터만 생성)
-3. JSON 문자열 내의 모든 LaTeX 백슬래시(\\)는 파싱 에러 방지를 위해 반드시 이중 백슬래시(\\\\\\\\)로 작성하세요. (예: \\\\vec{{E}}, \\\\nabla, \\\\rho)
-4. 출력은 반드시 아래의 JSON 포맷으로만 응답해야 합니다. (앞뒤 잡담, 마크다운 설명 금지)
+3. 출력은 반드시 아래의 JSON 포맷으로만 응답해야 합니다. (앞뒤 잡담, 마크다운 코드블록 금지)
 
 {{
   "doc_title": "[{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집",
   "figures": [
     {{
       "fig_num": "Fig 1",
-      "title": "도판 1 제목 (예: 정전기장 내 도체구 표면 전하 분포와 전기력선)",
-      "condition": "현상 및 조건 (물리적 파라미터, 경계 조건 등 LaTeX 수식 포함 1~2줄 서술)",
-      "visual_key": "시각적 핵심 (전기력선 방향, 가우스 곡면, 직교성 등 핵심 해석 1~2줄 서술)",
-      "drawing_spec": "SVG 작도를 위한 구체적 설계 지침 (예: 좌측 중심에 도체구 배치, 방사형 전기력선 화살표 및 등전위선 점선 표현 등)"
+      "title": "도판 1 제목",
+      "condition": "현상 및 조건 (수식 및 물리적 조건 서술)",
+      "visual_key": "시각적 핵심 (해석 서술)",
+      "drawing_spec": "SVG 작도를 위한 구체적 설계 지침"
     }},
     {{
       "fig_num": "Fig 2",
@@ -176,10 +175,10 @@ def plan_figures_with_gemini(raw_file_payload: list, subject_hint: str, unit_hin
             if match:
                 clean_json = match.group(1)
             
-            # JSON 파싱을 방해하는 비표준 LaTeX 백슬래시(\) 이스케이프 자동 치환
-            clean_json = re.sub(r'\\(?![/\\bfnrtu"U])', r'\\\\', clean_json)
+            # 파이썬 정규식 치환 함정 해결: lambda를 사용하여 LaTeX 백슬래시(\)를 완벽하게 이스케이프(\\)
+            fixed_json = re.sub(r'\\(?![/\\bfnrtu"U])', lambda m: r'\\', clean_json)
             
-            data = json.loads(clean_json)
+            data = json.loads(fixed_json, strict=False)
             print(f"  [Stage 1: 기획 완료] 도판 {len(data.get('figures', []))}개 기획 수립 성공!")
             return data
         except Exception as e:
@@ -248,7 +247,7 @@ def draw_single_svg_with_gemini(fig_info: dict, subject_hint: str) -> str:
 # ==============================================================================
 def sanitize_latex_html(text: str) -> str:
     """KaTeX 수식 내 부등호 충돌 방지"""
-    return text.replace("<", "&lt;").replace(">", "&gt;")
+    return str(text).replace("<", "&lt;").replace(">", "&gt;")
 
 
 def assemble_full_html(plan_data: dict, rendered_svgs: list) -> str:
@@ -471,7 +470,7 @@ def main():
                 continue
 
             try:
-                # 1단계: 도판 2개 기획 (JSON 파싱 및 에러 보정)
+                # 1단계: 도판 2개 기획 (람다 기반 이스케이프 보정)
                 plan_data = plan_figures_with_gemini(raw_file_payload, subject_hint, unit_hint)
                 
                 # 2단계: 순차 독립 SVG 작도
