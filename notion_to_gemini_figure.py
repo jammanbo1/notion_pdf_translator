@@ -61,7 +61,7 @@ def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
         "Content-Type": "application/pdf",
     }
 
-    safe_name = f"text_{int(time.time())}_{os.path.basename(file_path)}"
+    safe_name = f"fig_{int(time.time())}_{os.path.basename(file_path)}"
     params = {"name": safe_name}
 
     with open(file_path, "rb") as f:
@@ -98,8 +98,8 @@ def get_unprocessed_items():
     unprocessed = []
     for page in results:
         props = page.get("properties", {})
-        text_link_prop = props.get("내용 요약본", {})
-        existing_url = text_link_prop.get("url") if text_link_prop.get("type") == "url" else None
+        photo_link_prop = props.get("참고 사진", {})
+        existing_url = photo_link_prop.get("url") if photo_link_prop.get("type") == "url" else None
 
         if not existing_url:
             unprocessed.append(page)
@@ -125,67 +125,60 @@ def find_supported_attachments(page):
     return supported_files
 
 
-def extract_and_design_theory(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
+def extract_and_design_figures(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
-    prompt_text = f"""당신은 최고의 대학 이공계열 전공 학업 요약 전문가이자 세계적 물리학/수학 교재의 공식 편집자입니다.
-첨부된 자료를 정밀 분석하여, 지정된 컬러 체계(빨간색/파란색/초록색/보라색 및 주황색 코멘트)로 완벽히 통일된 최고급 A4 [내용 요약본] 리포트를 작성해주세요.
+    prompt_text = f"""당신은 세계 최고 수준의 이공계열 전공 학술서 전문 그래픽 아티스트이자 물리학/수학 교재 편집자입니다.
+첨부된 자료에 포함된 핵심 도판, 그래프, 개념 다이어그램들을 [단색 흑백(Monochrome) 학술 전공서 스타일]의 정밀 인라인 SVG 코드로 재작도하고,
+각 도판 하단에 2줄 핵심 요약 카드를 결합한 고품질 A4 [도판 해설 리포트]를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
-
-★ [핵심 지침]: SVG 코드는 절대 작성하지 마세요. (도판은 별도 생성됨) 개념의 엄밀한 정의, 깊이 있는 설명, 단계별 수식 유도, 실전 예제에 100% 집중하세요!
 
 [필수 출력 양식 1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
-DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 요약 및 개념 정리
+DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집
 
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [전용 컬러 배정 및 마크업 통일 절대 규칙]
-본문의 모든 박스와 뱃지, 코멘트는 반드시 아래 지정된 클래스만 사용하세요:
+★ [도판 스타일 및 SVG 작도 절대 규칙]
+1. 완전한 모노크롬(흑백 및 단색 그레이스케일) 원칙:
+   - 유색 컬러(Blue, Red, Green 등)는 일절 사용하지 마세요.
+   - 주요 외곽선 / 함수 곡선 / 주요 벡터 화살표: #0F172A (stroke-width="2.0" ~ "2.5")
+   - 기준 좌표축 / 주요 실선 / 눈금: #334155 또는 #475569 (stroke-width="1.2" ~ "1.4")
+   - 보조 투영선 / 점근선 / 가이드선: #64748B 또는 #94A3B8 (stroke-dasharray="4,4" 또는 "3,3")
+   - 입체 음영(3D Shading): 단색 그레이스케일 Linear/Radial Gradient(#FFFFFF -> #F8FAFC -> #E2E8F0 -> #CBD5E1 -> #64748B) 적용.
 
-1. 빨간색 (Red) -> [중요], [체크포인트], 핵심 공식/유도:
-   - <div class="note-box note-red"><span class="badge badge-red">중요</span> ...</div>
-   - <div class="note-box note-red"><span class="badge badge-red">체크포인트</span> ...</div>
-   - <div class="note-box note-red"><span class="badge badge-red">핵심 공식 유도</span> ...</div>
+2. 3차원 입체 도판 작도 기하학 규칙:
+   - 표준 3D 좌표축 투영: 원점 O 기준 z축(수직 상향), x축(좌하단 135°/210° 사선), y축(우측 수평 또는 완만한 우상향).
+   - Z-Index 및 가림선(Occlusion) 처리: 뒤로 넘어가는 선은 점선 처리하거나, 3D 본체 채움(fill="#FFFFFF" 또는 Gradient)으로 확실히 가려지도록 레이어 순서 엄수.
+   - 3D 단면 타원(Ellipse) 비율: 3차원 공간에 눕혀진 원/단면은 원근감 유지를 위해 가로로 납작한 타원(rx : ry ≈ 3:1 ~ 4:1)으로 작도.
+   - 3D 공간 벡터의 투영: 바닥(xy평면) 투영선과 수직(z축 방향) 높이선을 얇은 점선으로 이어 3D 공간 위치를 기하학적으로 입증할 것.
 
-2. 파란색 (Blue) -> [핵심 개념], [학습 목표]:
-   - <div class="note-box note-blue"><span class="badge badge-blue">학습 목표</span> ...</div>
-   - <div class="note-box note-blue"><span class="badge badge-blue">핵심 개념</span> ...</div>
+3. 엄밀한 수학/물리 라벨링:
+   - 모든 좌표축($x, y, z, t$), 물리 변수($\\vec{{v}}, \\vec{{a}}, \\vec{{E}}, \\vec{{B}}, \\vec{{P}}, I, \\theta, \\phi$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
+   - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요 (예: <tspan dy="-6" font-size="11">2</tspan><tspan dy="6">x</tspan> 또는 <tspan dy="3" font-size="11">in</tspan>).
+   - 모든 벡터와 축 끝에는 <defs><marker>로 화살표 머리를 깔끔하게 결합하세요.
 
-3. 초록색 (Green) -> [직관 비유], [해석 팁]:
-   - <div class="note-box note-green"><span class="badge badge-green">직관 비유</span> ...</div>
-
-4. 보라색 (Purple) -> [학습 점검], [실전 예제]:
-   <div class="practice-box">
-     <div class="practice-header"><span class="badge badge-purple">학습 점검</span> 실전 기출/적용 예제</div>
-     <div class="practice-question">
-       <strong>[문제]</strong> (상황 제시 및 질문)
+4. 도판별 구성 템플릿:
+   자료에 등장하는 각 핵심 그림마다 반드시 아래 구조의 <div class="figure-card">를 독립적으로 생성하세요:
+   
+   <div class="figure-card">
+     <div class="figure-header">
+       <span class="badge">Fig. 번호</span> <strong>도판 주제 및 핵심 물리 현상 제목</strong>
      </div>
-     <div class="practice-solution">
-       <div class="step-label">Step 1. 문제 모델링 및 핵심 공식 수립</div>
-       <p>...</p>
-       <div class="step-label">Step 2. 수식 전개 과정</div>
-       <div class="calc-step">$$ ... $$</div>
-       <div class="step-label">Step 3. 결과 해석 및 함정 방어</div>
-       <p>...</p>
+     <div class="svg-container">
+       <svg viewBox="0 0 520 320" width="100%" height="..." xmlns="http://www.w3.org/2000/svg">
+         <!-- 정밀 인라인 SVG 작도 -->
+       </svg>
+     </div>
+     <div class="figure-desc">
+       <p><strong>현상 및 조건:</strong> (도판의 기하학적 설정, 주어진 변수, 물리적 조건 서술)</p>
+       <p><strong>시각적 핵심:</strong> (대칭성, 수식과의 연결성, 물리 법칙 및 핵심 해석 포인트 서술)</p>
      </div>
    </div>
 
-5. 주황색 (Orange) -> [코멘트], [참고], [주의]:
-   - 본문 내용 중 보충 설명이 필요한 부분 옆이나 아래에 배치하세요.
-   <div class="comment-box">
-     <span class="badge badge-orange">코멘트</span> (보충 설명, 오개념 주의, 또는 교수님 강조 사항 등)
-   </div>
-
-★ [벡터 및 수식 표기 절대 통일 규칙]
-1. 모든 벡터는 볼드체(\\mathbf)를 일절 쓰지 말고, 기호 위에 화살표(\\vec{{...}})를 붙여 일관되게 표기할 것!
-   - 예: \\vec{{v}}, \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{F}}, \\vec{{r}}, \\vec{{h}}, \\vec{{\\nabla}}
-2. 미소 벡터 요소: 문자 위에 직접 화살표 표기 (d\\vec{{l}}, d\\vec{{r}}, d\\vec{{s}}, d\\vec{{a}} = \\hat{{n}} da, d\\vec{{S}} = \\hat{{n}} dS)
-3. 단위 벡터: 윗꺽쇠 표기 (\\hat{{n}}, \\hat{{r}}, \\hat{{x}}, \\hat{{y}}, \\hat{{z}})
-
-★ [시험 대비 치트시트 테이블]
-최하단에 <table class="cheat-sheet-table">로 핵심 공식 및 성질 요약 정리.
+★ [KaTeX 수식 파싱 보호 절대 규칙]
+- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 HTML 태그 충돌을 방지하기 위해 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $I &lt; 0$, $x &gt; 0$)
 """
     content_payload.append(prompt_text)
 
@@ -203,7 +196,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 요약 및 개념 정리
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  [내용 요약] -> [{model_name}] 모델 호출 시도 중...")
+        print(f"  [도판 생성] -> [{model_name}] 모델 호출 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -211,7 +204,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 요약 및 개념 정리
             )
             raw_text = response.text
             
-            extracted_title = "전공_핵심_요약_리포트"
+            extracted_title = "전공_도판_해설집"
             body_html = raw_text
             
             match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
@@ -219,7 +212,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 요약 및 개념 정리
                 extracted_title = match.group(1).strip()
                 body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
                 
-            print(f"  [내용 요약] -> [{model_name}] 생성 성공!")
+            print(f"  [도판 생성] -> [{model_name}] 생성 성공!")
             return extracted_title, body_html
 
         except Exception as e:
@@ -276,25 +269,23 @@ def build_full_html(title: str, content_html: str) -> str:
     letter-spacing: -0.5px;
   }}
   .doc-subtitle {{ font-size: 12px; color: #64748B; margin: 0; font-weight: 500; }}
-  
-  h2 {{ 
-    font-size: 15.5px; 
-    font-weight: 700; 
-    color: #0F172A; 
-    border-left: 3.5px solid #2563EB; 
-    padding-left: 9px; 
-    margin-top: 26px; 
-    margin-bottom: 12px; 
-    letter-spacing: -0.3px;
-  }}
-  h3 {{ 
-    font-size: 13.5px; 
-    font-weight: 700; 
-    color: #334155; 
-    margin-top: 18px; 
-    margin-bottom: 8px; 
-  }}
 
+  .figure-card {{
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 20px 0;
+    page-break-inside: avoid;
+  }}
+  .figure-header {{
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #F1F5F9;
+    padding-bottom: 8px;
+  }}
   .badge {{
     display: inline-block;
     font-size: 11px;
@@ -302,113 +293,36 @@ def build_full_html(title: str, content_html: str) -> str:
     padding: 2px 7px;
     border-radius: 4px;
     margin-right: 6px;
+    background: #F1F5F9;
+    color: #0F172A;
+    border: 1px solid #CBD5E1;
     letter-spacing: -0.2px;
-    vertical-align: middle;
   }}
-  .badge-red {{ background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }}
-  .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
-  .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
-  .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
-  .badge-orange {{ background-color: #FFF7ED; color: #EA580C; border: 1px solid #FFEDD5; }}
-
-  .note-box {{
-    background-color: #FFFFFF;
+  .svg-container {{
+    text-align: center;
+    background: #FFFFFF;
+    border: 1px solid #F8FAFC;
+    border-radius: 6px;
+    padding: 12px;
+  }}
+  .figure-desc {{
+    background: #F8FAFC;
     border: 1px solid #E2E8F0;
     border-radius: 6px;
-    padding: 12px 14px;
-    margin: 12px 0;
-    font-size: 12.5px;
+    padding: 10px 12px;
+    margin-top: 12px;
+    font-size: 12px;
     line-height: 1.65;
   }}
-  .note-red {{ border-left: 4px solid #DC2626; background-color: #FEF2F20D; }}
-  .note-blue {{ border-left: 4px solid #2563EB; background-color: #EFF6FF0D; }}
-  .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
-  .note-purple {{ border-left: 4px solid #7C3AED; background-color: #FAF5FF0D; }}
-
-  .comment-box {{
-    background-color: #FFF7ED;
-    border: 1px solid #FFEDD5;
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin: 10px 0;
-    font-size: 12px;
-    line-height: 1.6;
-    color: #9A3412;
-    font-style: italic;
+  .figure-desc p {{
+    margin: 3px 0;
   }}
-
-  .practice-box {{ 
-    background-color: #FFFFFF; 
-    border: 1px solid #E9D5FF; 
-    border-left: 4px solid #7C3AED; 
-    border-radius: 6px; 
-    padding: 15px; 
-    margin: 24px 0; 
-  }}
-  .practice-header {{ 
-    font-weight: 700; 
-    font-size: 13.5px; 
-    color: #5B21B6; 
-    margin-bottom: 10px; 
-    border-bottom: 1px solid #F3E8FF; 
-    padding-bottom: 6px; 
-  }}
-  .practice-question {{ 
-    background-color: #FAF5FF; 
-    border: 1px solid #F3E8FF; 
-    border-radius: 4px; 
-    padding: 11px; 
-    margin-bottom: 10px; 
-    font-size: 12.5px; 
-    line-height: 1.6; 
-  }}
-  .practice-solution {{ 
-    background-color: #FFFFFF; 
-    padding: 6px 4px; 
-    font-size: 12px; 
-  }}
-  .practice-solution .step-label {{ 
-    font-weight: 700; 
-    color: #7C3AED; 
-    margin-top: 8px; 
-    margin-bottom: 2px; 
-  }}
-  .calc-step {{ 
-    background-color: #FAF5FF; 
-    border: 1px solid #F3E8FF; 
-    border-radius: 4px; 
-    padding: 8px; 
-    margin: 4px 0 8px 0; 
-    text-align: center; 
-  }}
-
-  .cheat-sheet-table {{ 
-    width: 100%; 
-    border-collapse: collapse; 
-    margin: 20px 0 10px 0; 
-    font-size: 12px; 
-  }}
-  .cheat-sheet-table th {{ 
-    background-color: #0F172A; 
-    color: #FFFFFF; 
-    font-weight: 600; 
-    padding: 8px 10px; 
-    border: 1px solid #334155; 
-    text-align: center; 
-  }}
-  .cheat-sheet-table td {{ 
-    border: 1px solid #E2E8F0; 
-    padding: 8px 10px; 
-    text-align: center; 
-    background-color: #FFFFFF; 
-  }}
-  .cheat-sheet-table tr:nth-child(even) td {{ background-color: #F8FAFC; }}
 </style>
 </head>
 <body>
   <div class="header-container">
     <h1 class="doc-title">{title}</h1>
-    <p class="doc-subtitle">핵심 요약 및 개념 정리 리포트</p>
+    <p class="doc-subtitle">핵심 시각 자료 및 도판 해설집</p>
   </div>
   {clean_html}
 </body>
@@ -422,7 +336,7 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
         
-        # 폰트 및 KaTeX 수식 로딩 완료 대기
+        # 웹폰트 및 KaTeX 수식 로딩 완료 대기
         page.evaluate("document.fonts.ready")
         page.wait_for_timeout(1500)
         
@@ -435,16 +349,16 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser.close()
 
 
-def update_notion_text_success(page: dict, download_url: str):
+def update_notion_figure_success(page: dict, download_url: str):
     page_id = page["id"]
     props = page.get("properties", {})
     
-    update_data = {"내용 요약본": {"url": download_url}}
+    update_data = {"참고 사진": {"url": download_url}}
     
-    photo_prop = props.get("참고 사진", {})
-    photo_url = photo_prop.get("url") if photo_prop.get("type") == "url" else None
+    text_prop = props.get("내용 요약본", {})
+    text_url = text_prop.get("url") if text_prop.get("type") == "url" else None
     
-    if photo_url:
+    if text_url:
         try:
             update_data["상태"] = {"status": {"name": "완료"}}
         except Exception:
@@ -466,10 +380,10 @@ def sanitize_filename(filename: str) -> str:
 def main():
     items = get_unprocessed_items()
     if not items:
-        print("[내용 요약] 처리할 새 항목이 없습니다.")
+        print("[도판 생성] 처리할 새 항목이 없습니다.")
         return
 
-    print(f"[내용 요약] 미처리 항목 {len(items)}개 발견.")
+    print(f"[도판 생성] 미처리 항목 {len(items)}개 발견.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for page in items:
@@ -489,13 +403,13 @@ def main():
             if not files:
                 continue
 
-            print(f"\n[내용 요약 작업 시작] 과목: '{subject_hint}', 단원: '{unit_hint}' (파일 {len(files)}개)...")
+            print(f"\n[도판 작업 시작] 과목: '{subject_hint}', 단원명: '{unit_hint}' (첨부파일 {len(files)}개)...")
 
             try:
-                doc_title, body_html = extract_and_design_theory(files, subject_hint, unit_hint)
+                doc_title, body_html = extract_and_design_figures(files, subject_hint, unit_hint)
                 
                 safe_title = sanitize_filename(doc_title)
-                print(f"  -> PDF 제목/파일명: {doc_title}")
+                print(f"  -> PDF 리포트 제목/파일명: {doc_title}")
 
                 full_html = build_full_html(doc_title, body_html)
                 temp_pdf_path = os.path.join(temp_dir, f"{safe_title}.pdf")
@@ -505,8 +419,8 @@ def main():
                 pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{safe_title}.pdf")
                 print(f"  -> 다운로드 링크: {pdf_url}")
 
-                update_notion_text_success(page, pdf_url)
-                print("  -> Notion '내용 요약본' 등록 완료!\n")
+                update_notion_figure_success(page, pdf_url)
+                print("  -> Notion '참고 사진' 컬럼 업데이트 완료!\n")
 
                 time.sleep(1)
 
