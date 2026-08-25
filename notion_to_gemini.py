@@ -129,14 +129,10 @@ def extract_and_design_theory(file_list: list, subject_hint: str = "", unit_hint
     content_payload = []
 
     prompt_text = f"""당신은 세계 최고 수준의 이공계 전공 수석 해설위원이자 공식 전공서 편집자입니다.
-첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})는 이미 소단원 단위로 잘 선별된 상태입니다.
-슬라이드의 뻔한 단순 요약이나 목차 나열은 전면 배제하고, [슬라이드에서 생략된 수학적·논리적 징검다리(행간)를 완벽하게 복원하는 강의 보충 심층 해설집]을 작성하세요.
+첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})를 바탕으로, [원문 핵심 개념/수식(기준점) + 생략된 행간 유도 + 시험 함정]이 완벽히 대조되는 심층 보충 해설집을 작성하세요.
 
-★ [핵심 해설 지침]
-1. 단순 목차 나열이나 슬라이드 영어 텍스트의 1:1 단순 번역을 엄격히 금지합니다.
-2. 슬라이드에서 1줄로 축약된 수식 유도 과정, 알고리즘 단계별 포인터/메모리 변화를 명쾌한 징검다리(Step 1, 2, 3)로 상세히 풀어내세요.
-3. 첨부 자료의 여백, 행간, 도판 옆에 적힌 손글씨 필기/샤프 메모/교수님 강조 사항을 빠짐없이 판독하여 해설에 반영하세요.
-4. SVG 코드는 절대 생성하지 마세요. (도판은 별도 스크립트에서 생성됨)
+★ [작성 원칙]:
+단순 목차 나열을 배제하고, 슬라이드의 각 핵심 주제마다 반드시 아래 순서대로 1:1 대조 박스를 구성하세요.
 
 [필수 출력 양식 1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
@@ -145,22 +141,26 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 강의 보충 심층 해설집
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [본문 전용 박스 마크업 규격]
-본문의 모든 해설과 코멘트는 반드시 아래 4가지 지정 클래스만 사용하세요:
+★ [주제별 4단계 마크업 절대 규칙]
+각 핵심 주제(h2, h3)마다 다음 순서로 배치하세요:
 
-1. 파란색 (Blue) -> [도입 배경 & 공학적/물리적 직관]:
-   "왜 이 개념/자료구조/공식이 필요한가?"에 대한 직관적 배경과 핵심 의미 서술.
-   - <div class="note-box note-blue"><span class="badge badge-blue">핵심 직관</span> (직관적 비유 및 도입 배경 2~3줄)</div>
+1. [슬라이드 원문 핵심 공식/개념] (파란색 박스 - 기준점)
+   - 슬라이드에 제시된 핵심 수식이나 핵심 정의를 명확하게 제시
+   - <div class="note-box note-blue"><span class="badge badge-blue">원문 공식/개념</span> $$수식$$ <p>(슬라이드 원문 정의 및 의미 요약)</p></div>
 
-2. 빨간색 (Red) -> [생략된 행간 유도 & 동작 메커니즘]:
-   슬라이드에서 건너뛴 중간 계산식, 수식 전개 과정, 알고리즘 내부 로직을 단계별로 명시.
-   - <div class="note-box note-red"><span class="badge badge-red">생략된 유도 과정</span> (단계별 수식 및 유도 과정 전개)</div>
+2. [생략된 행간 유도 & 증명] (빨간색 박스 - 보충 해설)
+   - 슬라이드에서 1줄로 축약되거나 건너뛴 중간 계산 단계, 증명 과정, 알고리즘 내부 로직을 Step 1, 2, 3으로 상세히 전개
+   - <div class="note-box note-red"><span class="badge badge-red">생략된 행간 복원</span> (단계별 수식 전개 및 논리적 징검다리 해설)</div>
 
-3. 보라색 (Purple) -> [슬라이드 핵심 예제 / 코드 트레이싱 심층 해설]:
-   슬라이드에 등장하는 코드나 예제를 바탕으로 메모리 상태 변화와 실행 과정을 줄별로 트레이싱.
+3. [시험 함정 & 손글씨 필기 팁] (주황색 박스 - 오개념 방어)
+   - 빈출 오답 포인트, 인덱스 실수, N=0 등 경계 조건(Corner Cases), 자료 여백의 손글씨/샤프 필기 팁 복원
+   - <div class="comment-box"><span class="badge badge-orange">시험 함정 & 필기 팁</span> (오개념 주의, 경계 조건, 필기 복원 메모)</div>
+
+4. [슬라이드 대표 예제 / 코드 트레이싱] (보라색 박스 - 실전 적용)
+   - 슬라이드에 수록된 코드나 예제를 바탕으로 메모리 상태 변화 및 실행 흐름을 줄별로 트레이싱
    <div class="practice-box">
      <div class="practice-header"><span class="badge badge-purple">코드/예제 심층 분석</span> (예제 주제)</div>
-     <div class="practice-question"><strong>[분석 대상]</strong> (코드 블록 또는 예제 상황)</div>
+     <div class="practice-question"><strong>[분석 대상]</strong> (코드 또는 예제 상황)</div>
      <div class="practice-solution">
        <div class="step-label">Step 1. 동작 원리 및 메모리 레이아웃</div>
        <p>(포인터/배열 상태 및 구조 설명)</p>
@@ -169,16 +169,13 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 강의 보충 심층 해설집
      </div>
    </div>
 
-4. 주황색 (Orange) -> [시험 빈출 함정 & 손글씨 필기 코멘트]:
-   학생들이 흔히 저지르는 오개념, $N=0$ 등 경계 조건(Corner Cases), 샤프 필기 팁 집중 해설.
-   - <div class="comment-box"><span class="badge badge-orange">시험 함정 & 필기 팁</span> (오개념 주의, 경계 조건, 필기 복원 메모)</div>
-
 ★ [벡터 및 수식 표기 절대 통일 규칙]
 1. 물리/수학 벡터: 볼드체(\\mathbf) 금지, 기호 위에 화살표(\\vec{{...}}) 표기 준수 (예: \\vec{{E}}, \\vec{{B}}, \\vec{{v}}, \\vec{{\\nabla}})
 2. 단위 벡터: 윗꺽쇠 표기 (\\hat{{n}}, \\hat{{r}}, \\hat{{x}}, \\hat{{y}}, \\hat{{z}})
+3. SVG 코드는 절대 작성하지 마세요. (도판은 별도 생성됨)
 
 ★ [단원 핵심 비교 표]
-최하단에 <table class="cheat-sheet-table">을 사용하여 알고리즘별 시간/공간 복잡도, 공식 비교를 깔끔한 표로 요약 정리하세요.
+최하단에 <table class="cheat-sheet-table">을 사용하여 단원의 핵심 공식, 시간/공간 복잡도 비교를 표로 깔끔히 마무리하세요.
 """
     content_payload.append(prompt_text)
 
