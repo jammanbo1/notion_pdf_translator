@@ -125,41 +125,60 @@ def find_supported_attachments(page):
     return supported_files
 
 
+def clean_extracted_html(raw_text: str) -> str:
+    """잡담/생각과정/마크다운 메타텍스트를 원천 차단하고 순수 HTML만 추출"""
+    # 1. ```html ... ``` 블록 추출
+    code_match = re.search(r"```html\s*([\s\S]*?)\s*```", raw_text, re.IGNORECASE)
+    if code_match:
+        return code_match.group(1).strip()
+    
+    # 2. figure-card <div> 태그 추출
+    div_match = re.search(r"(<div class=[\"']figure-card[\"'][\s\S]*</div>)", raw_text, re.IGNORECASE)
+    if div_match:
+        return div_match.group(1).strip()
+
+    # 3. 일반 ``` ... ``` 블록 추출
+    generic_match = re.search(r"```\s*([\s\S]*?)\s*```", raw_text)
+    if generic_match:
+        return generic_match.group(1).strip()
+
+    # 4. 최후의 수단: DOC_TITLE 라인만 제거
+    cleaned = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text)
+    return cleaned.strip()
+
+
 def extract_and_design_figures(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
     prompt_text = f"""당신은 세계 최고 수준의 이공계열 전공 학술서 전문 그래픽 아티스트이자 물리학/수학/전자공학 교재 수석 편집자입니다.
 첨부된 자료에서 가장 핵심적인 도판, 그래프, 개념 다이어그램을 [엄선하여 2개~최대 3개] 선정하고,
-[단색 흑백(Monochrome) 학술 전공서 스타일]의 극도로 정밀한 인라인 SVG 코드로 완벽히 재작도하여 고품질 A4 [도판 해설 리포트]를 작성해주세요.
+[단색 흑백(Monochrome) 학술 전공서 스타일]의 극도로 정밀한 인라인 SVG 코드로 재작도하여 고품질 A4 [도판 해설 리포트]를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
 
-[필수 출력 양식 1단계: 제목 생성]
-답변 첫 줄에 반드시 다음 형식으로 출력:
+★ [출력 형식 절대 준수 - 잡담/메타 텍스트 금지]:
+1. 첫 번째 줄에는 오직 문서 제목만 다음 포맷으로 작성하세요:
 DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집
-
-[2단계: 본문 HTML 작성]
-제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
+2. 두 번째 줄부터는 사전 설명, 계획(Plan), 생각 과정, 인사말을 일절 쓰지 말고 오직 ```html 로 시작하여 ``` 로 끝나는 코드 블록만 출력하세요.
 
 ★ [도판 엄선 및 완성도 절대 규칙]
-1. 도판 개수는 무조건 [가장 중요한 2개~3개]만 엄선하여 집중 작도하세요. (절대 4개 이상 과도하게 나열하지 말 것!)
+1. 도판 개수는 무조건 [가장 중요한 2개~3개]만 엄선하여 집중 작도하세요. (4개 이상 남발 금지)
 2. 텍스트 땜질 절대 금지:
-   - 텍스트나 수식만 띄워놓고 도형/곡선을 대충 얼버무리는 다이어그램은 절대 허용되지 않습니다.
+   - 텍스트나 수식만 띄워놓고 도형/곡선을 생략하는 것은 절대 허용되지 않습니다.
    - 실제 함수 파형(톱니파, 구형파, 지수함수, 정현파 등)과 회로 소자, 좌표축, 투영선, 임펄스 화살표를 구체적인 SVG 패스(<path d="...">, <line>, <rect>)로 끝까지 정밀하게 완벽히 그리세요.
 
 ★ [도판 스타일 및 SVG 작도 규격]
 1. 완전한 모노크롬(흑백 및 단색 그레이스케일) 원칙:
-   - 유색 컬러(Blue, Red, Green 등)는 일절 사용 금지.
+   - 유색 컬러(Blue, Red, Green 등) 사용 금지.
    - 주요 외곽선 / 함수 곡선 / 주요 벡터: #0F172A (stroke-width="2.0" ~ "2.5")
    - 기준 좌표축 / 회로 도선 / 눈금: #334155 또는 #475569 (stroke-width="1.2" ~ "1.4")
-   - 보조 투영선 / 점근선 / 슬라이딩 면적: #64748B 또는 #94A3B8 (stroke-dasharray="4,4")
+   - 보조 투영선 / 점근선 / 가이드선: #64748B 또는 #94A3B8 (stroke-dasharray="4,4")
    - 3D 입체 음영 및 면적 채움: 단색 그레이스케일 Linear/Radial Gradient(#FFFFFF -> #F1F5F9 -> #CBD5E1 -> #94A3B8).
 
 2. SVG 뷰박스 및 레이아웃:
-   - 각 SVG는 반드시 viewBox="0 0 540 280" (또는 세로가 긴 경우 viewBox="0 0 540 320")으로 충분한 여백을 확보하세요.
-   - 텍스트와 선이 겹치지 않도록 좌표 간격을 여유 있게 배치하세요.
+   - 각 SVG는 viewBox="0 0 540 280" (또는 viewBox="0 0 540 320")으로 충분한 여백을 확보하세요.
 
 3. 엄밀한 수학/물리 라벨링:
-   - 모든 좌표축($x, y, z, t, \omega$), 물리 변수($\\vec{{v}}, \\vec{{E}}, \\vec{{B}}, \\vec{{P}}, I, V_0, \\tau, \\omega_0$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
+   - 모든 좌표축($x, y, z, t, \\omega$), 물리 변수($\\vec{{v}}, \\vec{{E}}, \\vec{{B}}, \\vec{{P}}, I, V_0, \\tau, \\omega_0$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
    - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요.
    - 화살표는 <defs><marker>로 선 끝에 깔끔하게 결합하세요.
 
@@ -180,7 +199,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
    </div>
 
 ★ [KaTeX 수식 파싱 보호 절대 규칙]
-- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $t &lt; 0$, $\omega &gt; 0$)
+- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $t &lt; 0$, $\\omega &gt; 0$)
 """
     content_payload.append(prompt_text)
 
@@ -212,12 +231,11 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
             raw_text = response.text
             
             extracted_title = "전공_도판_해설집"
-            body_html = raw_text
-            
-            match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
-            if match:
-                extracted_title = match.group(1).strip()
-                body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
+            title_match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
+            if title_match:
+                extracted_title = title_match.group(1).strip()
+                
+            body_html = clean_extracted_html(raw_text)
                 
             print(f"  [도판 생성] -> [{model_name}] 생성 성공!")
             return extracted_title, body_html
@@ -232,10 +250,6 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
 
 
 def build_full_html(title: str, content_html: str) -> str:
-    clean_html = re.sub(
-        r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE
-    )
-
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -331,7 +345,7 @@ def build_full_html(title: str, content_html: str) -> str:
     <h1 class="doc-title">{title}</h1>
     <p class="doc-subtitle">핵심 시각 자료 및 도판 해설집</p>
   </div>
-  {clean_html}
+  {content_html}
 </body>
 </html>
 """
