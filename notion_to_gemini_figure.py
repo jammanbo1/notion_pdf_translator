@@ -128,9 +128,9 @@ def find_supported_attachments(page):
 def extract_and_design_figures(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
-    prompt_text = f"""당신은 세계 최고 수준의 이공계열 전공 학술서 전문 그래픽 아티스트이자 물리학/수학 교재 편집자입니다.
-첨부된 자료에 포함된 핵심 도판, 그래프, 개념 다이어그램들을 [단색 흑백(Monochrome) 학술 전공서 스타일]의 정밀 인라인 SVG 코드로 재작도하고,
-각 도판 하단에 2줄 핵심 요약 카드를 결합한 고품질 A4 [도판 해설 리포트]를 작성해주세요.
+    prompt_text = f"""당신은 세계 최고 수준의 이공계열 전공 학술서 전문 그래픽 아티스트이자 물리학/수학/전자공학 교재 수석 편집자입니다.
+첨부된 자료에서 가장 핵심적인 도판, 그래프, 개념 다이어그램을 [엄선하여 2개~최대 3개] 선정하고,
+[단색 흑백(Monochrome) 학술 전공서 스타일]의 극도로 정밀한 인라인 SVG 코드로 완벽히 재작도하여 고품질 A4 [도판 해설 리포트]를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
 
 [필수 출력 양식 1단계: 제목 생성]
@@ -140,45 +140,47 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [도판 스타일 및 SVG 작도 절대 규칙]
-1. 완전한 모노크롬(흑백 및 단색 그레이스케일) 원칙:
-   - 유색 컬러(Blue, Red, Green 등)는 일절 사용하지 마세요.
-   - 주요 외곽선 / 함수 곡선 / 주요 벡터 화살표: #0F172A (stroke-width="2.0" ~ "2.5")
-   - 기준 좌표축 / 주요 실선 / 눈금: #334155 또는 #475569 (stroke-width="1.2" ~ "1.4")
-   - 보조 투영선 / 점근선 / 가이드선: #64748B 또는 #94A3B8 (stroke-dasharray="4,4" 또는 "3,3")
-   - 입체 음영(3D Shading): 단색 그레이스케일 Linear/Radial Gradient(#FFFFFF -> #F8FAFC -> #E2E8F0 -> #CBD5E1 -> #64748B) 적용.
+★ [도판 엄선 및 완성도 절대 규칙]
+1. 도판 개수는 무조건 [가장 중요한 2개~3개]만 엄선하여 집중 작도하세요. (절대 4개 이상 과도하게 나열하지 말 것!)
+2. 텍스트 땜질 절대 금지:
+   - 텍스트나 수식만 띄워놓고 도형/곡선을 대충 얼버무리는 다이어그램은 절대 허용되지 않습니다.
+   - 실제 함수 파형(톱니파, 구형파, 지수함수, 정현파 등)과 회로 소자, 좌표축, 투영선, 임펄스 화살표를 구체적인 SVG 패스(<path d="...">, <line>, <rect>)로 끝까지 정밀하게 완벽히 그리세요.
 
-2. 3차원 입체 도판 작도 기하학 규칙:
-   - 표준 3D 좌표축 투영: 원점 O 기준 z축(수직 상향), x축(좌하단 135°/210° 사선), y축(우측 수평 또는 완만한 우상향).
-   - Z-Index 및 가림선(Occlusion) 처리: 뒤로 넘어가는 선은 점선 처리하거나, 3D 본체 채움(fill="#FFFFFF" 또는 Gradient)으로 확실히 가려지도록 레이어 순서 엄수.
-   - 3D 단면 타원(Ellipse) 비율: 3차원 공간에 눕혀진 원/단면은 원근감 유지를 위해 가로로 납작한 타원(rx : ry ≈ 3:1 ~ 4:1)으로 작도.
-   - 3D 공간 벡터의 투영: 바닥(xy평면) 투영선과 수직(z축 방향) 높이선을 얇은 점선으로 이어 3D 공간 위치를 기하학적으로 입증할 것.
+★ [도판 스타일 및 SVG 작도 규격]
+1. 완전한 모노크롬(흑백 및 단색 그레이스케일) 원칙:
+   - 유색 컬러(Blue, Red, Green 등)는 일절 사용 금지.
+   - 주요 외곽선 / 함수 곡선 / 주요 벡터: #0F172A (stroke-width="2.0" ~ "2.5")
+   - 기준 좌표축 / 회로 도선 / 눈금: #334155 또는 #475569 (stroke-width="1.2" ~ "1.4")
+   - 보조 투영선 / 점근선 / 슬라이딩 면적: #64748B 또는 #94A3B8 (stroke-dasharray="4,4")
+   - 3D 입체 음영 및 면적 채움: 단색 그레이스케일 Linear/Radial Gradient(#FFFFFF -> #F1F5F9 -> #CBD5E1 -> #94A3B8).
+
+2. SVG 뷰박스 및 레이아웃:
+   - 각 SVG는 반드시 viewBox="0 0 540 280" (또는 세로가 긴 경우 viewBox="0 0 540 320")으로 충분한 여백을 확보하세요.
+   - 텍스트와 선이 겹치지 않도록 좌표 간격을 여유 있게 배치하세요.
 
 3. 엄밀한 수학/물리 라벨링:
-   - 모든 좌표축($x, y, z, t$), 물리 변수($\\vec{{v}}, \\vec{{a}}, \\vec{{E}}, \\vec{{B}}, \\vec{{P}}, I, \\theta, \\phi$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
-   - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요 (예: <tspan dy="-6" font-size="11">2</tspan><tspan dy="6">x</tspan> 또는 <tspan dy="3" font-size="11">in</tspan>).
-   - 모든 벡터와 축 끝에는 <defs><marker>로 화살표 머리를 깔끔하게 결합하세요.
+   - 모든 좌표축($x, y, z, t, \omega$), 물리 변수($\\vec{{v}}, \\vec{{E}}, \\vec{{B}}, \\vec{{P}}, I, V_0, \\tau, \\omega_0$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
+   - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요.
+   - 화살표는 <defs><marker>로 선 끝에 깔끔하게 결합하세요.
 
-4. 도판별 구성 템플릿:
-   자료에 등장하는 각 핵심 그림마다 반드시 아래 구조의 <div class="figure-card">를 독립적으로 생성하세요:
-   
+4. 도판별 구성 템플릿 (각 도판마다 아래 구조를 독립적으로 엄수):
    <div class="figure-card">
      <div class="figure-header">
-       <span class="badge">Fig. 번호</span> <strong>도판 주제 및 핵심 물리 현상 제목</strong>
+       <span class="badge">Fig. 번호</span> <strong>도판 주제 및 핵심 물리/회로 현상 제목</strong>
      </div>
      <div class="svg-container">
-       <svg viewBox="0 0 520 320" width="100%" height="..." xmlns="http://www.w3.org/2000/svg">
+       <svg viewBox="0 0 540 280" width="100%" height="240" xmlns="http://www.w3.org/2000/svg">
          <!-- 정밀 인라인 SVG 작도 -->
        </svg>
      </div>
      <div class="figure-desc">
-       <p><strong>현상 및 조건:</strong> (도판의 기하학적 설정, 주어진 변수, 물리적 조건 서술)</p>
-       <p><strong>시각적 핵심:</strong> (대칭성, 수식과의 연결성, 물리 법칙 및 핵심 해석 포인트 서술)</p>
+       <p><strong>현상 및 조건:</strong> (기하학적 설정, 주어진 입력 신호, 회로 파라미터 등 물리 조건 서술)</p>
+       <p><strong>시각적 핵심:</strong> (파형의 대칭성, 감쇠율, 오버슈트, 주파수 스펙트럼 등 핵심 해석 서술)</p>
      </div>
    </div>
 
 ★ [KaTeX 수식 파싱 보호 절대 규칙]
-- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 HTML 태그 충돌을 방지하기 위해 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $I &lt; 0$, $x &gt; 0$)
+- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $t &lt; 0$, $\omega &gt; 0$)
 """
     content_payload.append(prompt_text)
 
@@ -194,11 +196,16 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
             )
         content_payload.append({"mime_type": mime_type, "data": res.content})
 
+    generation_config = {
+        "max_output_tokens": 8192,
+        "temperature": 0.2,
+    }
+
     last_exception = None
     for model_name in FALLBACK_MODELS:
         print(f"  [도판 생성] -> [{model_name}] 모델 호출 시도 중...")
         try:
-            current_model = genai.GenerativeModel(model_name)
+            current_model = genai.GenerativeModel(model_name, generation_config=generation_config)
             response = current_model.generate_content(
                 content_payload, request_options={"timeout": 600}
             )
@@ -262,7 +269,7 @@ def build_full_html(title: str, content_html: str) -> str:
     margin-bottom: 22px; 
   }}
   .doc-title {{ 
-    font-size: 21px; 
+    font-size: 20px; 
     font-weight: 800; 
     color: #0F172A; 
     margin: 0 0 6px 0; 
@@ -275,7 +282,7 @@ def build_full_html(title: str, content_html: str) -> str:
     border: 1px solid #E2E8F0;
     border-radius: 8px;
     padding: 16px;
-    margin: 20px 0;
+    margin: 22px 0;
     page-break-inside: avoid;
   }}
   .figure-header {{
