@@ -143,15 +143,23 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
 ★ [도판 스타일 및 SVG 작도 절대 규칙]
 1. 완전한 모노크롬(흑백 및 단색 그레이스케일) 원칙:
    - 유색 컬러(Blue, Red, Green 등)는 일절 사용하지 마세요.
-   - 주요 외곽선/곡선/화살표: #0F172A (선 굵기: 2.0 ~ 2.5px)
-   - 보조선/축/눈금: #334155 또는 #475569 (선 굵기: 1.2 ~ 1.4px)
-   - 보조 투영선/점근선/가이드: #64748B 또는 #94A3B8 (stroke-dasharray="4,4")
-   - 입체 음영(3D Shading): 단색 그레이스케일 Linear/Radial Gradient(#F8FAFC ~ #64748B) 적용.
-2. 엄밀한 수학/물리 라벨링:
-   - 모든 좌표축, 변수, 기호는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
-   - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요.
-   - 벡터 화살표는 <defs><marker>로 선 끝에 깔끔하게 결합하세요.
-3. 도판별 구성 템플릿:
+   - 주요 외곽선 / 함수 곡선 / 주요 벡터 화살표: #0F172A (stroke-width="2.0" ~ "2.5")
+   - 기준 좌표축 / 주요 실선 / 눈금: #334155 또는 #475569 (stroke-width="1.2" ~ "1.4")
+   - 보조 투영선 / 점근선 / 가이드선: #64748B 또는 #94A3B8 (stroke-dasharray="4,4" 또는 "3,3")
+   - 입체 음영(3D Shading): 단색 그레이스케일 Linear/Radial Gradient(#FFFFFF -> #F8FAFC -> #E2E8F0 -> #CBD5E1 -> #64748B) 적용.
+
+2. 3차원 입체 도판 작도 기하학 규칙:
+   - 표준 3D 좌표축 투영: 원점 O 기준 z축(수직 상향), x축(좌하단 135°/210° 사선), y축(우측 수평 또는 완만한 우상향).
+   - Z-Index 및 가림선(Occlusion) 처리: 뒤로 넘어가는 선은 점선 처리하거나, 3D 본체 채움(fill="#FFFFFF" 또는 Gradient)으로 확실히 가려지도록 레이어 순서 엄수.
+   - 3D 단면 타원(Ellipse) 비율: 3차원 공간에 눕혀진 원/단면은 원근감 유지를 위해 가로로 납작한 타원(rx : ry ≈ 3:1 ~ 4:1)으로 작도.
+   - 3D 공간 벡터의 투영: 바닥(xy평면) 투영선과 수직(z축 방향) 높이선을 얇은 점선으로 이어 3D 공간 위치를 기하학적으로 입증할 것.
+
+3. 엄밀한 수학/물리 라벨링:
+   - 모든 좌표축($x, y, z, t$), 물리 변수($\vec{v}, \vec{a}, \vec{E}, \vec{B}, \vec{P}, I, \theta, \phi$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
+   - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요 (예: <tspan dy="-6" font-size="11">2</tspan><tspan dy="6">x</tspan> 또는 <tspan dy="3" font-size="11">in</tspan>).
+   - 모든 벡터와 축 끝에는 <defs><marker>로 화살표 머리를 깔끔하게 결합하세요.
+
+4. 도판별 구성 템플릿:
    자료에 등장하는 각 핵심 그림마다 반드시 아래 구조의 <div class="figure-card">를 독립적으로 생성하세요:
    
    <div class="figure-card">
@@ -159,7 +167,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
        <span class="badge">Fig. 번호</span> <strong>도판 주제 및 핵심 물리 현상 제목</strong>
      </div>
      <div class="svg-container">
-       <svg viewBox="0 0 520 300" width="100%" height="..." xmlns="http://www.w3.org/2000/svg">
+       <svg viewBox="0 0 520 320" width="100%" height="..." xmlns="http://www.w3.org/2000/svg">
          <!-- 정밀 인라인 SVG 작도 -->
        </svg>
      </div>
@@ -170,7 +178,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
    </div>
 
 ★ [KaTeX 수식 파싱 보호 절대 규칙]
-- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 HTML 파싱 에러를 유발하므로 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $I &lt; 0$, $x &gt; 0$)
+- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 HTML 태그 충돌을 방지하기 위해 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $I &lt; 0$, $x &gt; 0$)
 """
     content_payload.append(prompt_text)
 
@@ -328,7 +336,7 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
         
-        # 폰트 및 KaTeX 수식 로딩 완료 대기
+        # 웹폰트 및 KaTeX 수식 로딩 완료 대기
         page.evaluate("document.fonts.ready")
         page.wait_for_timeout(1500)
         
