@@ -22,10 +22,10 @@ notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
 FALLBACK_MODELS = [
-    "gemini-3.5-flash-lite"
+    "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
     "gemini-3.6-flash",
-    "gemini-3.7-flash",
+    "gemini-3.7-flash"
 ]
 
 
