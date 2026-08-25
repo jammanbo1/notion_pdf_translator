@@ -23,9 +23,9 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 FALLBACK_MODELS = [
     "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
     "gemini-3.6-flash",
-    "gemini-3.7-flash"
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
 ]
 
 
@@ -137,17 +137,18 @@ def plan_figures_with_gemini(raw_file_payload: list, subject_hint: str, unit_hin
 ★ 절대 규칙:
 1. 도판 개수는 무조건 [가장 중요한 2개]만 선정하세요.
 2. SVG 코드나 HTML 태그는 일절 작성하지 마세요. (순수 기획 데이터만 생성)
-3. 출력은 반드시 아래의 JSON 포맷으로만 응답해야 합니다. (앞뒤 잡담, 마크다운 설명 금지)
+3. JSON 문자열 내의 모든 LaTeX 백슬래시(\\)는 파싱 에러 방지를 위해 반드시 이중 백슬래시(\\\\\\\\)로 작성하세요. (예: \\\\vec{{E}}, \\\\nabla, \\\\rho)
+4. 출력은 반드시 아래의 JSON 포맷으로만 응답해야 합니다. (앞뒤 잡담, 마크다운 설명 금지)
 
 {{
   "doc_title": "[{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집",
   "figures": [
     {{
       "fig_num": "Fig 1",
-      "title": "도판 1 제목 (예: 직렬 RLC 회로의 과도 응답 및 복소 주파수 평면)",
-      "condition": "현상 및 조건 (회로 파라미터, 입력 신호, 기하학적 조건 등 LaTeX 수식 포함 1~2줄 서술)",
-      "visual_key": "시각적 핵심 (파형의 시정수, 3D 투영, 오버슈트, 점근선 등 핵심 해석 1~2줄 서술)",
-      "drawing_spec": "SVG 작도를 위한 구체적 설계 지침 (예: 좌측에는 RLC 폐회로 소자 배치, 우측에는 감쇠 진동 곡선 v(t)와 시간축 t, 시정수 가이드 점선 배치 등)"
+      "title": "도판 1 제목 (예: 정전기장 내 도체구 표면 전하 분포와 전기력선)",
+      "condition": "현상 및 조건 (물리적 파라미터, 경계 조건 등 LaTeX 수식 포함 1~2줄 서술)",
+      "visual_key": "시각적 핵심 (전기력선 방향, 가우스 곡면, 직교성 등 핵심 해석 1~2줄 서술)",
+      "drawing_spec": "SVG 작도를 위한 구체적 설계 지침 (예: 좌측 중심에 도체구 배치, 방사형 전기력선 화살표 및 등전위선 점선 표현 등)"
     }},
     {{
       "fig_num": "Fig 2",
@@ -164,14 +165,19 @@ def plan_figures_with_gemini(raw_file_payload: list, subject_hint: str, unit_hin
     for model_name in FALLBACK_MODELS:
         try:
             print(f"  [Stage 1: 도판 기획] -> [{model_name}] 호출 중...")
-            model = genai.GenerativeModel(model_name, generation_config={"temperature": 0.2, "response_mime_type": "application/json"})
+            model = genai.GenerativeModel(
+                model_name,
+                generation_config={"temperature": 0.2, "response_mime_type": "application/json"}
+            )
             res = model.generate_content(payload, request_options={"timeout": 300})
             
             clean_json = res.text.strip()
-            # JSON 추출 방어
             match = re.search(r"(\{[\s\S]*\})", clean_json)
             if match:
                 clean_json = match.group(1)
+            
+            # JSON 파싱을 방해하는 비표준 LaTeX 백슬래시(\) 이스케이프 자동 치환
+            clean_json = re.sub(r'\\(?![/\\bfnrtu"U])', r'\\\\', clean_json)
             
             data = json.loads(clean_json)
             print(f"  [Stage 1: 기획 완료] 도판 {len(data.get('figures', []))}개 기획 수립 성공!")
@@ -223,13 +229,12 @@ def draw_single_svg_with_gemini(fig_info: dict, subject_hint: str) -> str:
             res = model.generate_content([prompt_text], request_options={"timeout": 300})
             
             raw_svg = res.text.strip()
-            # 순수 SVG 태그만 정밀 추출
             svg_match = re.search(r"(<svg[\s\S]*?</svg>)", raw_svg, re.IGNORECASE)
             if svg_match:
                 print(f"    [Stage 2: 작도 성공] -> {fig_info.get('fig_num')} 완성!")
                 return svg_match.group(1).strip()
             else:
-                raise ValueError("SVG 태그를 감지하지 못함")
+                raise ValueError("SVG 태그 감지 실패")
         except Exception as e:
             print(f"    [Stage 2 경고] {fig_info.get('fig_num')} 실패: {e}")
             time.sleep(2)
@@ -382,7 +387,6 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
         
-        # 폰트 및 KaTeX 렌더링 완료 대기
         page.evaluate("document.fonts.ready")
         page.wait_for_timeout(1500)
         
@@ -451,7 +455,6 @@ def main():
 
             print(f"\n[작업 시작] 과목: '{subject_hint}', 단원: '{unit_hint}' (파일 {len(files)}개)...")
 
-            # 파일 다운로드 및 멀티모달 페이로드 구성
             raw_file_payload = []
             for item in files:
                 try:
@@ -468,17 +471,17 @@ def main():
                 continue
 
             try:
-                # 1단계: 도판 2개 기획 (JSON 수신)
+                # 1단계: 도판 2개 기획 (JSON 파싱 및 에러 보정)
                 plan_data = plan_figures_with_gemini(raw_file_payload, subject_hint, unit_hint)
                 
-                # 2단계: 기획된 도판 1개씩 순차 독립 작도 (순수 SVG 수신)
+                # 2단계: 순차 독립 SVG 작도
                 rendered_svgs = []
                 for fig_info in plan_data.get("figures", []):
                     svg_code = draw_single_svg_with_gemini(fig_info, subject_hint)
                     rendered_svgs.append(svg_code)
-                    time.sleep(1)  # 안정적인 호출 간격
+                    time.sleep(1)
 
-                # 3단계: 파이썬에서 HTML 조립 & PDF 컴파일
+                # 3단계: 로컬 템플릿 조립 & PDF 컴파일
                 doc_title = plan_data.get("doc_title", f"[{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집")
                 safe_title = sanitize_filename(doc_title)
                 full_html = assemble_full_html(plan_data, rendered_svgs)
