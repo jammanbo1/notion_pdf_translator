@@ -155,7 +155,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설
    - 3D 공간 벡터의 투영: 바닥(xy평면) 투영선과 수직(z축 방향) 높이선을 얇은 점선으로 이어 3D 공간 위치를 기하학적으로 입증할 것.
 
 3. 엄밀한 수학/물리 라벨링:
-   - 모든 좌표축($x, y, z, t$), 물리 변수($\vec{v}, \vec{a}, \vec{E}, \vec{B}, \vec{P}, I, \theta, \phi$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
+   - 모든 좌표축($x, y, z, t$), 물리 변수($\\vec{{v}}, \\vec{{a}}, \\vec{{E}}, \\vec{{B}}, \\vec{{P}}, I, \\theta, \\phi$)는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
    - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요 (예: <tspan dy="-6" font-size="11">2</tspan><tspan dy="6">x</tspan> 또는 <tspan dy="3" font-size="11">in</tspan>).
    - 모든 벡터와 축 끝에는 <defs><marker>로 화살표 머리를 깔끔하게 결합하세요.
 
