@@ -129,7 +129,7 @@ def extract_and_design_theory(file_list: list, subject_hint: str = "", unit_hint
     content_payload = []
 
     prompt_text = f"""당신은 세계 최고 수준의 이공계 전공 수석 해설위원이자 공식 전공서 편집자입니다.
-첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})를 바탕으로, [원문 핵심 개념/수식(기준점) + 생략된 행간 유도 + 시험 함정]이 완벽히 대조되는 심층 보충 해설집을 작성하세요.
+첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})를 바탕으로, [원문 공식(기준점) + 도입 배경/직관 + 생략된 행간 유도 + 시험 함정]이 완벽히 대조되는 심층 보충 해설집을 작성하세요.
 
 ★ [작성 원칙]:
 단순 목차 나열을 배제하고, 슬라이드의 각 핵심 주제마다 반드시 아래 순서대로 1:1 대조 박스를 구성하세요.
@@ -141,22 +141,26 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 강의 보충 심층 해설집
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [주제별 4단계 마크업 절대 규칙]
+★ [주제별 5단계 마크업 절대 규칙]
 각 핵심 주제(h2, h3)마다 다음 순서로 배치하세요:
 
 1. [슬라이드 원문 핵심 공식/개념] (파란색 박스 - 기준점)
-   - 슬라이드에 제시된 핵심 수식이나 핵심 정의를 명확하게 제시
+   - 슬라이드에 제시된 핵심 수식이나 정의를 명확하게 제시
    - <div class="note-box note-blue"><span class="badge badge-blue">원문 공식/개념</span> $$수식$$ <p>(슬라이드 원문 정의 및 의미 요약)</p></div>
 
-2. [생략된 행간 유도 & 증명] (빨간색 박스 - 보충 해설)
+2. [도입 배경 & 물리적/공학적 직관] (초록색 박스 - Why)
+   - "왜 이 공식/자료구조가 필요한가?"에 대한 문제의식, 한계 극복 배경, 직관적 비유 서술 (2~3줄)
+   - <div class="note-box note-green"><span class="badge badge-green">도입 배경 & 핵심 직관</span> <p>(기존 방식의 한계와 이 개념이 등장한 필연적 이유, 물리적/공학적 직관 설명)</p></div>
+
+3. [생략된 행간 유도 & 증명] (빨간색 박스 - How)
    - 슬라이드에서 1줄로 축약되거나 건너뛴 중간 계산 단계, 증명 과정, 알고리즘 내부 로직을 Step 1, 2, 3으로 상세히 전개
    - <div class="note-box note-red"><span class="badge badge-red">생략된 행간 복원</span> (단계별 수식 전개 및 논리적 징검다리 해설)</div>
 
-3. [시험 함정 & 손글씨 필기 팁] (주황색 박스 - 오개념 방어)
+4. [시험 함정 & 손글씨 필기 팁] (주황색 박스 - Pitfall)
    - 빈출 오답 포인트, 인덱스 실수, N=0 등 경계 조건(Corner Cases), 자료 여백의 손글씨/샤프 필기 팁 복원
    - <div class="comment-box"><span class="badge badge-orange">시험 함정 & 필기 팁</span> (오개념 주의, 경계 조건, 필기 복원 메모)</div>
 
-4. [슬라이드 대표 예제 / 코드 트레이싱] (보라색 박스 - 실전 적용)
+5. [슬라이드 대표 예제 / 코드 트레이싱] (보라색 박스 - Practice, 해당 내용이 있을 때)
    - 슬라이드에 수록된 코드나 예제를 바탕으로 메모리 상태 변화 및 실행 흐름을 줄별로 트레이싱
    <div class="practice-box">
      <div class="practice-header"><span class="badge badge-purple">코드/예제 심층 분석</span> (예제 주제)</div>
@@ -297,6 +301,7 @@ def build_full_html(title: str, content_html: str) -> str:
   }}
   .badge-red {{ background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }}
   .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
+  .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
   .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
   .badge-orange {{ background-color: #FFF7ED; color: #EA580C; border: 1px solid #FFEDD5; }}
 
@@ -311,6 +316,7 @@ def build_full_html(title: str, content_html: str) -> str:
   }}
   .note-red {{ border-left: 4px solid #DC2626; background-color: #FEF2F20D; }}
   .note-blue {{ border-left: 4px solid #2563EB; background-color: #EFF6FF0D; }}
+  .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
 
   .comment-box {{
     background-color: #FFF7ED;
