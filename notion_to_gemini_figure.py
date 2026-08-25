@@ -98,7 +98,6 @@ def get_unprocessed_items():
     unprocessed = []
     for page in results:
         props = page.get("properties", {})
-        # '참고 사진' 컬럼이 비어있는 항목만 필터링
         photo_link_prop = props.get("참고 사진", {})
         existing_url = photo_link_prop.get("url") if photo_link_prop.get("type") == "url" else None
 
@@ -129,44 +128,49 @@ def find_supported_attachments(page):
 def extract_and_design_figures(file_list: list, subject_hint: str = "", unit_hint: str = "") -> tuple:
     content_payload = []
     
-    # 피드백을 통해 학습·축적된 SVG 고도화 프롬프트
-    prompt_text = f"""당신은 세계적 이공계열 전공 교재의 수석 테크니컬 일러스트레이터입니다.
-첨부된 자료에서 직관 형성에 필수적인 핵심 그래프, 벡터장, 전자기학적 기하 구조, 회로도 3~5개를 선별하여 정밀 SVG로 작도하고,
-각각에 대해 1~2줄 핵심 설명이 담긴 [참고 사진 리포트]를 작성해주세요.
+    prompt_text = f"""당신은 세계 최고 수준의 이공계열 전공 학술서 전문 그래픽 아티스트이자 물리학/수학 교재 편집자입니다.
+첨부된 자료에 포함된 핵심 도판, 그래프, 개념 다이어그램들을 [단색 흑백(Monochrome) 학술 전공서 스타일]의 정밀 인라인 SVG 코드로 재작도하고,
+각 도판 하단에 2줄 핵심 요약 카드를 결합한 고품질 A4 [도판 해설 리포트]를 작성해주세요.
 (참고 과목: {subject_hint}, 단원명: {unit_hint})
 
 [필수 출력 양식 1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
-DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 도판 및 시각 자료 정리
+DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집
 
 [2단계: 본문 HTML 작성]
-제목 아랫줄부터는 본문 HTML 코드만 작성하세요. 각 도판은 반드시 아래 <div class="figure-card"> 구조를 따릅니다.
+제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [도판 카드 표준 마크업 양식]
-<div class="figure-card">
-  <div class="figure-header">
-    <span class="badge badge-blue">Fig 1</span> <strong>(도판 제목: 예 - 직렬 RLC 회로의 공진 주파수 응답 곡선)</strong>
-  </div>
-  <div class="svg-container">
-    <!-- SVG 코드 본문 (반드시 viewBox를 정의하여 반응형 크기 지원) -->
-  </div>
-  <div class="figure-desc">
-    <p class="desc-line"><strong>현상 및 조건:</strong> [X축]에 따른 [Y축]의 변화를 나타내며, ...일 때 성립함.</p>
-    <p class="desc-line"><strong>시각적 핵심:</strong> [변곡점/기울기/특이점]에서 ... 메커니즘이 발생하므로 주의.</p>
-  </div>
-</div>
+★ [도판 스타일 및 SVG 작도 절대 규칙]
+1. 완전한 모노크롬(흑백 및 단색 그레이스케일) 원칙:
+   - 유색 컬러(Blue, Red, Green 등)는 일절 사용하지 마세요.
+   - 주요 외곽선/곡선/화살표: #0F172A (선 굵기: 2.0 ~ 2.5px)
+   - 보조선/축/눈금: #334155 또는 #475569 (선 굵기: 1.2 ~ 1.4px)
+   - 보조 투영선/점근선/가이드: #64748B 또는 #94A3B8 (stroke-dasharray="4,4")
+   - 입체 음영(3D Shading): 단색 그레이스케일 Linear/Radial Gradient(#F8FAFC ~ #64748B) 적용.
+2. 엄밀한 수학/물리 라벨링:
+   - 모든 좌표축, 변수, 기호는 학술 세리프 이탤릭체(font-family="Times New Roman, serif", font-style="italic")를 적용하세요.
+   - 위첨자/아래첨자는 SVG의 <tspan> 태그를 정밀하게 사용하세요.
+   - 벡터 화살표는 <defs><marker>로 선 끝에 깔끔하게 결합하세요.
+3. 도판별 구성 템플릿:
+   자료에 등장하는 각 핵심 그림마다 반드시 아래 구조의 <div class="figure-card">를 독립적으로 생성하세요:
+   
+   <div class="figure-card">
+     <div class="figure-header">
+       <span class="badge">Fig. 번호</span> <strong>도판 주제 및 핵심 물리 현상 제목</strong>
+     </div>
+     <div class="svg-container">
+       <svg viewBox="0 0 520 300" width="100%" height="..." xmlns="http://www.w3.org/2000/svg">
+         <!-- 정밀 인라인 SVG 작도 -->
+       </svg>
+     </div>
+     <div class="figure-desc">
+       <p><strong>현상 및 조건:</strong> (도판의 기하학적 설정, 주어진 변수, 물리적 조건 서술)</p>
+       <p><strong>시각적 핵심:</strong> (대칭성, 수식과의 연결성, 물리 법칙 및 핵심 해석 포인트 서술)</p>
+     </div>
+   </div>
 
-★ [피드백 학습 기반 SVG 작도 절대 규칙]
-1. [라벨 글자 깨짐 방지]: SVG 내부의 모든 수식과 축 라벨은 <foreignObject width="..." height="...">를 쓰고, 내부에 $...$ KaTeX 문법을 사용하여 선명하게 렌더링할 것.
-2. [벡터 표기 규칙]: 
-   - 벡터 화살표: \\vec{{E}}, \\vec{{B}}, \\vec{{A}}, \\vec{{J}}, \\vec{{\\nabla}} (볼드체 \\mathbf 절대 금지)
-   - 단위 벡터: \\hat{{n}}, \\hat{{r}}, \\hat{{x}}, \\hat{{y}}, \\hat{{z}}
-   - 미소 요소: d\\vec{{l}}, d\\vec{{a}} = \\hat{{n}} da
-3. [좌표축 및 시각성]:
-   - 축 화살표(<marker>)를 명확히 정의하고 축 이름($x, y, z$ 또는 주파수, 시간)을 끝점에 반드시 표시.
-   - 배경은 투명 또는 #FFFFFF, 주 선 색상은 #2563EB(Blue), #DC2626(Red), 보조선은 점선(#94A3B8) 사용.
-4. [설명 분량 제약]:
-   - 도판 설명(figure-desc)은 줄글을 길게 쓰지 말고, 현상/조건 1줄, 시각적 핵심 포인트 1줄로 딱 2줄 요약할 것!
+★ [KaTeX 수식 파싱 보호 절대 규칙]
+- figure-desc 본문 수식 작성 시 부등호(<, >)나 앰퍼샌드(&)는 HTML 파싱 에러를 유발하므로 반드시 '&lt;', '&gt;', '&amp;' 엔티티로 변환하여 작성하세요! (예: $I &lt; 0$, $x &gt; 0$)
 """
     content_payload.append(prompt_text)
 
@@ -184,7 +188,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 도판 및 시각 자료 정리
 
     last_exception = None
     for model_name in FALLBACK_MODELS:
-        print(f"  [참고 사진] -> [{model_name}] 모델 호출 시도 중...")
+        print(f"  [도판 생성] -> [{model_name}] 모델 호출 시도 중...")
         try:
             current_model = genai.GenerativeModel(model_name)
             response = current_model.generate_content(
@@ -192,7 +196,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 도판 및 시각 자료 정리
             )
             raw_text = response.text
             
-            extracted_title = "전공_참고_사진"
+            extracted_title = "전공_도판_해설집"
             body_html = raw_text
             
             match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
@@ -200,7 +204,7 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] 핵심 도판 및 시각 자료 정리
                 extracted_title = match.group(1).strip()
                 body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
                 
-            print(f"  [참고 사진] -> [{model_name}] 생성 성공!")
+            print(f"  [도판 생성] -> [{model_name}] 생성 성공!")
             return extracted_title, body_html
 
         except Exception as e:
@@ -238,7 +242,7 @@ def build_full_html(title: str, content_html: str) -> str:
   body {{ 
     font-family: 'Pretendard', sans-serif; 
     color: #1E293B; 
-    line-height: 1.7; 
+    line-height: 1.75; 
     font-size: 13px; 
     margin: 0; 
     background-color: #FFFFFF;
@@ -258,6 +262,22 @@ def build_full_html(title: str, content_html: str) -> str:
   }}
   .doc-subtitle {{ font-size: 12px; color: #64748B; margin: 0; font-weight: 500; }}
 
+  .figure-card {{
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 20px 0;
+    page-break-inside: avoid;
+  }}
+  .figure-header {{
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #F1F5F9;
+    padding-bottom: 8px;
+  }}
   .badge {{
     display: inline-block;
     font-size: 11px;
@@ -265,53 +285,36 @@ def build_full_html(title: str, content_html: str) -> str:
     padding: 2px 7px;
     border-radius: 4px;
     margin-right: 6px;
-    letter-spacing: -0.2px;
-    vertical-align: middle;
-  }}
-  .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
-
-  .figure-card {{
-    background-color: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 8px;
-    padding: 16px;
-    margin: 22px 0;
-    page-break-inside: avoid;
-  }}
-  .figure-header {{
-    font-size: 14px;
-    font-weight: 700;
+    background: #F1F5F9;
     color: #0F172A;
-    margin-bottom: 12px;
-    border-bottom: 1px solid #F1F5F9;
-    padding-bottom: 8px;
+    border: 1px solid #CBD5E1;
+    letter-spacing: -0.2px;
   }}
-  .svg-container {{ 
-    text-align: center; 
-    margin: 12px 0; 
-    background-color: #FFFFFF; 
-    border-radius: 6px; 
-    padding: 10px; 
+  .svg-container {{
+    text-align: center;
+    background: #FFFFFF;
+    border: 1px solid #F8FAFC;
+    border-radius: 6px;
+    padding: 12px;
   }}
-  .svg-container svg {{ max-width: 100%; height: auto; display: block; margin: 0 auto; }}
-
   .figure-desc {{
-    background-color: #F8FAFC;
+    background: #F8FAFC;
     border: 1px solid #E2E8F0;
     border-radius: 6px;
-    padding: 10px 14px;
+    padding: 10px 12px;
     margin-top: 12px;
     font-size: 12px;
     line-height: 1.65;
   }}
-  .figure-desc p {{ margin: 4px 0; }}
-  .desc-line strong {{ color: #1E293B; }}
+  .figure-desc p {{
+    margin: 3px 0;
+  }}
 </style>
 </head>
 <body>
   <div class="header-container">
     <h1 class="doc-title">{title}</h1>
-    <p class="doc-subtitle">핵심 도판 및 시각 자료 분석 카드북</p>
+    <p class="doc-subtitle">핵심 시각 자료 및 도판 해설집</p>
   </div>
   {clean_html}
 </body>
@@ -324,7 +327,11 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
-        page.wait_for_timeout(1000)
+        
+        # 폰트 및 KaTeX 수식 로딩 완료 대기
+        page.evaluate("document.fonts.ready")
+        page.wait_for_timeout(1500)
+        
         page.pdf(
             path=output_pdf_path,
             format="A4",
@@ -340,7 +347,6 @@ def update_notion_figure_success(page: dict, download_url: str):
     
     update_data = {"참고 사진": {"url": download_url}}
     
-    # '내용 요약본' 컬럼도 이미 URL이 들어있으면 최종 '완료' 처리
     text_prop = props.get("내용 요약본", {})
     text_url = text_prop.get("url") if text_prop.get("type") == "url" else None
     
@@ -366,10 +372,10 @@ def sanitize_filename(filename: str) -> str:
 def main():
     items = get_unprocessed_items()
     if not items:
-        print("[참고 사진] 처리할 새 항목이 없습니다.")
+        print("[도판 생성] 처리할 새 항목이 없습니다.")
         return
 
-    print(f"[참고 사진] 미처리 항목 {len(items)}개 발견.")
+    print(f"[도판 생성] 미처리 항목 {len(items)}개 발견.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for page in items:
@@ -389,12 +395,14 @@ def main():
             if not files:
                 continue
 
-            print(f"\n[참고 사진 작업 시작] 과목: '{subject_hint}', 단원: '{unit_hint}' (파일 {len(files)}개)")
+            print(f"\n[도판 작업 시작] 과목: '{subject_hint}', 단원명: '{unit_hint}' (첨부파일 {len(files)}개)...")
 
             try:
                 doc_title, body_html = extract_and_design_figures(files, subject_hint, unit_hint)
-                safe_title = sanitize_filename(doc_title)
                 
+                safe_title = sanitize_filename(doc_title)
+                print(f"  -> PDF 리포트 제목/파일명: {doc_title}")
+
                 full_html = build_full_html(doc_title, body_html)
                 temp_pdf_path = os.path.join(temp_dir, f"{safe_title}.pdf")
                 render_html_to_pdf(full_html, temp_pdf_path)
@@ -404,7 +412,7 @@ def main():
                 print(f"  -> 다운로드 링크: {pdf_url}")
 
                 update_notion_figure_success(page, pdf_url)
-                print("  -> Notion '참고 사진' 등록 완료!\n")
+                print("  -> Notion '참고 사진' 컬럼 업데이트 완료!\n")
 
                 time.sleep(1)
 
