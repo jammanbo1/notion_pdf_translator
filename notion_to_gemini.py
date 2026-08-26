@@ -21,6 +21,7 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
+# 안정적인 최신 모델 폴백 라인업
 FALLBACK_MODELS = [
     "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
@@ -43,7 +44,7 @@ def get_or_create_release(tag="pdf-reports"):
     payload = {
         "tag_name": tag,
         "name": "Generated PDF Reports",
-        "body": "자동 생성된 PDF 정리본 보관소입니다.",
+        "body": "자동 생성된 전공 PDF 심층 해설집 보관소입니다.",
         "draft": False,
         "prerelease": False,
     }
@@ -62,7 +63,7 @@ def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
         "Content-Type": "application/pdf",
     }
 
-    safe_name = f"part_{int(time.time())}_{os.path.basename(file_path)}"
+    safe_name = f"doc_{int(time.time())}_{os.path.basename(file_path)}"
     params = {"name": safe_name}
 
     with open(file_path, "rb") as f:
@@ -142,22 +143,37 @@ def prepare_file_payload(file_list: list) -> list:
     return payload
 
 
-def plan_content_sections(file_payload: list, subject_hint: str = "", unit_hint: str = "") -> list:
-    planning_prompt = f"""당신은 이공계 전공 커리큘럼 설계자입니다.
-첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})의 전체 분량을 검토하고, 한 번에 집중해서 학습할 수 있는 **[독립된 소주제 목록]**으로 내용을 분할하세요.
+def plan_balanced_chunks(file_payload: list, subject_hint: str = "", unit_hint: str = "") -> list:
+    """슬라이드 전체를 스캔하여 (개념 수 + 예제/과제 수 <= 4) 규칙으로 내용 기반 똑똑한 분할"""
+    planning_prompt = f"""당신은 이공계 전공 강의 교재 전문 기획자입니다.
+첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})의 전체 내용을 분석하여, 각 파트가 8,192 토큰 한도 내에서 100% 깊이 있게 해설될 수 있도록 **[최적 분할 계획]**을 수립하세요.
 
-★ [분할 기준]:
-1. 각 파트는 '핵심 개념 1~2개 + 관련 유도 과정 + 연계 예제/코드'가 하나로 완결되도록 묶으세요.
-2. 자료 분량이 적으면 1~2개 파트로, 자료가 방대하거나 문제가 많으면 3~5개 파트 이상으로 유연하게 결정하세요.
-3. 반드시 아래의 순수 JSON 배열 형식으로만 응답하세요. 다른 설명 문장은 절대 작성하지 마세요.
+★ [엄격한 분할 용량 규칙]:
+1. 1개 파트(Part)당 용량 합계는 반드시 **[핵심 개념 2~3개 + 예제/과제(H.W.) 1~2개] (총합 최대 4개 이하)**로 제한하세요.
+2. 예시:
+   - 개념 2개 + 예제 2개 = 1개 파트 (적정)
+   - 개념 3개 + 예제 1개 = 1개 파트 (적정)
+   - 순수 문제/H.W.만 있는 구간: 문제 3~4개 = 1개 파트 (적정)
+3. 전체 슬라이드에 개념이 많다면 규칙에 맞춰 여러 파트로 균등하게 쪼개야 합니다.
+4. 반드시 아래 JSON 배열 형식으로만 출력하세요. (추가 설명 금지)
 
-[응답 JSON 형식 예시]:
+[응답 JSON 포맷]:
 [
-  {{"part_index": 1, "topic_title": "쿨롱 법칙과 전기장의 중첩 원리", "scope_description": "점전하 분포 및 연속 전하에 의한 전기장 적분 계산"}},
-  {{"part_index": 2, "topic_title": "가우스 법칙과 전하 대칭성", "scope_description": "구/원통/평면 대칭성 분석 및 내부/외부 전기장 유도"}}
+  {{
+    "part_index": 1,
+    "part_title": "자기 홀극 도입 및 확장된 맥스웰 방정식",
+    "concepts": ["자기 홀극(Magnetic Monopole) 정의", "미정계수 f 유도 및 패러데이 법칙 확장"],
+    "examples": ["점 자기 홀극의 구형 가우스면 자속 적분 증명"]
+  }},
+  {{
+    "part_index": 2,
+    "part_title": "전자기 이중성과 SO(2) 대칭 그룹 확장",
+    "concepts": ["90도 이중성 변환(Discrete)", "연속적 SO(2) 회전 변환 및 불변성 증명"],
+    "examples": ["과제(H.W.): SO(2) 변환에 대한 맥스웰 방정식 공변성 증명"]
+  }}
 ]
 """
-    print("  [단원 분석] -> 강의 자료 구조 및 분할 계획 수립 중...")
+    print("  [1단계: 단원 구조 스캔] -> 개념 및 예제/H.W. 수량 기반 안전 분할 계획 수립 중...")
     for model_name in FALLBACK_MODELS:
         try:
             model = genai.GenerativeModel(model_name)
@@ -165,40 +181,43 @@ def plan_content_sections(file_payload: list, subject_hint: str = "", unit_hint:
             clean_json = re.sub(r"^```json\s*|^```\s*|\s*```$", "", response.text.strip(), flags=re.MULTILINE)
             plan = json.loads(clean_json)
             if isinstance(plan, list) and len(plan) > 0:
-                print(f"  [단원 분석 완료] 총 {len(plan)}개 파트로 동적 분할 결정.")
+                print(f"  [분할 계획 확정] 총 {len(plan)}개 독립 파트로 안전 분할 완료.")
                 return plan
         except Exception as e:
-            print(f"  [경고] {model_name} 계획 수립 실패 ({e}), 재시도 중...")
+            print(f"  [경고] {model_name} 계획 수립 실패 ({e}), 백업 모델 시도...")
             time.sleep(1)
 
-    return [{"part_index": 1, "topic_title": f"{unit_hint} 핵심 해설", "scope_description": "단원 전체 내용 심층 해설"}]
+    return [{"part_index": 1, "part_title": f"{unit_hint} 핵심 해설", "concepts": ["핵심 이론"], "examples": ["대표 예제"]}]
 
 
-def generate_section_commentary(file_payload: list, subject_hint: str, unit_hint: str, section: dict, total_parts: int) -> tuple:
-    part_idx = section.get("part_index", 1)
-    topic_title = section.get("topic_title", "")
-    scope_desc = section.get("scope_description", "")
+def generate_part_html(file_payload: list, subject_hint: str, unit_hint: str, chunk_info: dict, total_parts: int) -> tuple:
+    part_idx = chunk_info.get("part_index", 1)
+    part_title = chunk_info.get("part_title", "")
+    concepts = chunk_info.get("concepts", [])
+    examples = chunk_info.get("examples", [])
 
-    prompt_text = f"""당신은 세계 최고 수준의 이공계 전공 수석 해설위원입니다.
-첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})에서 아래 지정된 **[대상 소주제]**에만 100% 토큰을 집중하여 완결된 심층 보충 해설집을 작성하세요.
+    prompt_text = f"""당신은 세계 최고 수준의 이공계 전공 수석 해설위원이자 공식 전공서 편집자입니다.
+첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})에서 아래 **[지정된 파트 내용]**에만 100% 토큰을 집중하여 완결된 심층 보충 해설집을 작성하세요.
 
-★ [현재 작성 대상 소주제]:
-- 파트: Part {part_idx}/{total_parts}
-- 주제: {topic_title}
-- 범위 및 세부 내용: {scope_desc}
+★ [현재 작성 대상 파트 ({part_idx}/{total_parts})]:
+- 파트 제목: {part_title}
+- 담당 핵심 개념 목록: {json.dumps(concepts, ensure_ascii=False)}
+- 담당 예제/H.W./코드 목록: {json.dumps(examples, ensure_ascii=False)}
 
 ★ [작성 원칙]:
-다른 소주제는 과감히 배제하고, 현재 지정된 소주제의 '원문 공식, 직관, 생략된 행간 유도, 시험 함정, 관련 예제'를 최고 밀도로 서술하세요.
+1. 지정되지 않은 다른 소주제는 과감히 생략하고, 오직 위 목록의 개념과 예제에 모든 분량을 쏟아부으세요.
+2. 유도 과정(Step 1, 2, 3)과 문제 풀이는 중간 생략 없이 수식($\LaTeX$)과 논리를 빈틈없이 전개하세요.
 
 [1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
-DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {topic_title})
+DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {part_title})
 
 [2단계: 본문 HTML 작성]
 제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
 
-★ [5단계 완결 마크업 절대 규칙]
-1. [슬라이드 원문 핵심 공식/개념] (파란색 박스 - 기준점)
+★ [주제별 5단계 완결 마크업 절대 규칙]
+다루는 각 개념마다:
+1. [원문 공식/개념] (파란색 박스 - 기준점)
    <div class="note-box note-blue"><span class="badge badge-blue">원문 공식/개념</span> $$수식$$ <p>(슬라이드 원문 정의 및 의미 요약)</p></div>
 
 2. [도입 배경 & 핵심 직관] (초록색 박스 - Why)
@@ -210,31 +229,32 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {topic_title})
 4. [시험 함정 & 필기 팁] (주황색 박스 - Pitfall)
    <div class="comment-box"><span class="badge badge-orange">시험 함정 & 필기 팁</span> (오개념 주의, N=0 등 경계 조건, 손글씨 필기 복원)</div>
 
-5. [해당 주제 연계 예제 / 코드 트레이싱] (보라색 박스 - Practice, 관련 예제 있을 시)
+다루는 각 예제/과제(H.W.)/코드마다:
+5. [실전 예제 / H.W. / 코드 트레이싱] (보라색 박스 - Practice)
    <div class="practice-box">
-     <div class="practice-header"><span class="badge badge-purple">실전 분석</span> (예제/코드 주제)</div>
-     <div class="practice-question"><strong>[문제 상황 / 코드]</strong> (상황 서술 또는 코드 제시)</div>
+     <div class="practice-header"><span class="badge badge-purple">실전 분석</span> (예제/과제 제목)</div>
+     <div class="practice-question"><strong>[문제 상황 / 코드 / 과제 원문]</strong> (상황 서술 또는 코드)</div>
      <div class="practice-solution">
-       <div class="step-label">Step 1. 초기 조건 및 레이아웃 분석</div>
-       <p>(경계 조건 또는 포인터/메모리 구조)</p>
-       <div class="step-label">Step 2. 실행 흐름 트레이싱 및 계산</div>
+       <div class="step-label">Step 1. 물리적 조건 / 초기 메모리 레이아웃 분석</div>
+       <p>(경계 조건, 좌표계 설정, 포인터 상태)</p>
+       <div class="step-label">Step 2. 단계별 실행 흐름 트레이싱 및 수식 유도</div>
        <div class="calc-step">$$ ... $$</div>
-       <div class="step-label">Step 3. 결과 해석 및 주의점</div>
+       <div class="step-label">Step 3. 결과 해석 및 감점 방지 팁</div>
+       <p>(시간 복잡도, 부호 주의점, 물리적 의미)</p>
      </div>
    </div>
 
-★ [벡터 표기 통일]: 화살표(\\vec{{...}}), 단위벡터(\\hat{{...}}), 볼드체(\\mathbf) 금지.
-★ [최하단 치트시트]: <table class="cheat-sheet-table">로 현재 파트의 핵심 공식/복잡도 요약.
+★ [최하단 치트시트]: <table class="cheat-sheet-table">로 현재 파트의 핵심 공식 비교 요약.
 """
 
     for model_name in FALLBACK_MODELS:
-        print(f"  [Part {part_idx}/{total_parts}] -> [{model_name}] 생성 호출 중...")
+        print(f"    -> [{model_name}] Part {part_idx}/{total_parts} 호출 중...")
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content([prompt_text] + file_payload, request_options={"timeout": 600})
+            
             raw_text = response.text
-
-            extracted_title = f"Part_{part_idx}_{topic_title}"
+            extracted_title = f"Part_{part_idx}_{part_title}"
             body_html = raw_text
 
             match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
@@ -242,34 +262,45 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {topic_title})
                 extracted_title = match.group(1).strip()
                 body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
 
-            print(f"  [Part {part_idx}/{total_parts}] -> [{model_name}] 생성 완료!")
             return extracted_title, body_html
+
         except Exception as e:
-            print(f"  [경고] {model_name} 실패 ({e}), 백업 모델로 전환...")
+            print(f"    [경고] {model_name} 실패 ({e}), 백업 모델로 전환...")
             time.sleep(2)
             continue
 
-    raise RuntimeError(f"Part {part_idx} 생성 실패")
+    raise RuntimeError(f"Part {part_idx} 생성 최종 실패")
 
 
 def build_full_html(title: str, subtitle: str, content_html: str) -> str:
     clean_html = re.sub(r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE)
 
+    # [수정됨] MathJax v3 및 렌더링 완료 대기 플래그(#math-rendered-flag) 완벽 적용
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <title>{title}</title>
-<link rel="stylesheet" href="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css)">
-<script defer src="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js)"></script>
-<script defer src="[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js)"
-        onload="renderMathInElement(document.body, {{
-            delimiters: [
-                {{left: '$$', right: '$$', display: true}},
-                {{left: '$', right: '$', display: false}}
-            ],
-            throwOnError: false
-        }});"></script>
+<script>
+  window.MathJax = {{
+    tex: {{
+      inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+      displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+      processEscapes: true
+    }},
+    startup: {{
+      pageReady: () => {{
+        return MathJax.startup.defaultPageReady().then(() => {{
+          // 수식 렌더링이 모두 끝나면 이 div를 만들어 Playwright에 신호를 줍니다.
+          const flag = document.createElement('div');
+          flag.id = 'math-rendered-flag';
+          document.body.appendChild(flag);
+        }});
+      }}
+    }}
+  }};
+</script>
+<script id="MathJax-script" async src="[https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js](https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js)"></script>
 <style>
   @import url('[https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap](https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap)');
   @page {{ size: A4; margin: 18mm 14mm; }}
@@ -281,150 +312,31 @@ def build_full_html(title: str, subtitle: str, content_html: str) -> str:
     margin: 0; 
     background-color: #FFFFFF;
   }}
-  
-  .header-container {{ 
-    border-bottom: 2px solid #0F172A; 
-    padding-bottom: 12px; 
-    margin-bottom: 22px; 
-  }}
-  .doc-title {{ 
-    font-size: 20px; 
-    font-weight: 800; 
-    color: #0F172A; 
-    margin: 0 0 6px 0; 
-    letter-spacing: -0.5px;
-  }}
+  .header-container {{ border-bottom: 2px solid #0F172A; padding-bottom: 12px; margin-bottom: 22px; }}
+  .doc-title {{ font-size: 19px; font-weight: 800; color: #0F172A; margin: 0 0 6px 0; letter-spacing: -0.5px; }}
   .doc-subtitle {{ font-size: 12px; color: #64748B; margin: 0; font-weight: 500; }}
-  
-  h2 {{ 
-    font-size: 15.5px; 
-    font-weight: 700; 
-    color: #0F172A; 
-    border-left: 3.5px solid #2563EB; 
-    padding-left: 9px; 
-    margin-top: 26px; 
-    margin-bottom: 12px; 
-    letter-spacing: -0.3px;
-  }}
-  h3 {{ 
-    font-size: 13.5px; 
-    font-weight: 700; 
-    color: #334155; 
-    margin-top: 18px; 
-    margin-bottom: 8px; 
-  }}
-
-  .badge {{
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 4px;
-    margin-right: 6px;
-    letter-spacing: -0.2px;
-    vertical-align: middle;
-  }}
+  h2 {{ font-size: 15px; font-weight: 700; color: #0F172A; border-left: 3.5px solid #2563EB; padding-left: 9px; margin-top: 24px; margin-bottom: 12px; }}
+  .badge {{ display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin-right: 6px; letter-spacing: -0.2px; vertical-align: middle; }}
   .badge-red {{ background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }}
   .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
   .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
   .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
   .badge-orange {{ background-color: #FFF7ED; color: #EA580C; border: 1px solid #FFEDD5; }}
-
-  .note-box, .comment-box, .practice-box {{
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }}
-
-  .note-box {{
-    background-color: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 6px;
-    padding: 12px 14px;
-    margin: 12px 0;
-    font-size: 12.5px;
-    line-height: 1.65;
-  }}
+  .note-box, .comment-box, .practice-box {{ break-inside: avoid; page-break-inside: avoid; }}
+  .note-box {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px 14px; margin: 12px 0; font-size: 12.5px; line-height: 1.65; }}
   .note-red {{ border-left: 4px solid #DC2626; background-color: #FEF2F20D; }}
   .note-blue {{ border-left: 4px solid #2563EB; background-color: #EFF6FF0D; }}
   .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
-
-  .comment-box {{
-    background-color: #FFF7ED;
-    border: 1px solid #FFEDD5;
-    border-left: 4px solid #EA580C;
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin: 12px 0;
-    font-size: 12px;
-    line-height: 1.6;
-    color: #9A3412;
-  }}
-
-  .practice-box {{ 
-    background-color: #FFFFFF; 
-    border: 1px solid #E9D5FF; 
-    border-left: 4px solid #7C3AED; 
-    border-radius: 6px; 
-    padding: 14px; 
-    margin: 18px 0; 
-  }}
-  .practice-header {{ 
-    font-weight: 700; 
-    font-size: 13px; 
-    color: #5B21B6; 
-    margin-bottom: 8px; 
-    border-bottom: 1px solid #F3E8FF; 
-    padding-bottom: 6px; 
-  }}
-  .practice-question {{ 
-    background-color: #FAF5FF; 
-    border: 1px solid #F3E8FF; 
-    border-radius: 4px; 
-    padding: 10px; 
-    margin-bottom: 10px; 
-    font-size: 12px; 
-    line-height: 1.6; 
-  }}
-  .practice-solution {{ 
-    background-color: #FFFFFF; 
-    padding: 4px; 
-    font-size: 12px; 
-  }}
-  .practice-solution .step-label {{ 
-    font-weight: 700; 
-    color: #7C3AED; 
-    margin-top: 8px; 
-    margin-bottom: 2px; 
-  }}
-  .calc-step {{ 
-    background-color: #FAF5FF; 
-    border: 1px solid #F3E8FF; 
-    border-radius: 4px; 
-    padding: 8px; 
-    margin: 6px 0; 
-    text-align: center; 
-  }}
-
-  .cheat-sheet-table {{ 
-    width: 100%; 
-    border-collapse: collapse; 
-    margin: 18px 0 10px 0; 
-    font-size: 12px; 
-  }}
-  .cheat-sheet-table th {{ 
-    background-color: #0F172A; 
-    color: #FFFFFF; 
-    font-weight: 600; 
-    padding: 8px 10px; 
-    border: 1px solid #334155; 
-    text-align: center; 
-  }}
-  .cheat-sheet-table td {{ 
-    border: 1px solid #E2E8F0; 
-    padding: 8px 10px; 
-    text-align: center; 
-    background-color: #FFFFFF; 
-  }}
+  .comment-box {{ background-color: #FFF7ED; border: 1px solid #FFEDD5; border-left: 4px solid #EA580C; border-radius: 6px; padding: 10px 12px; margin: 12px 0; font-size: 12px; line-height: 1.6; color: #9A3412; }}
+  .practice-box {{ background-color: #FFFFFF; border: 1px solid #E9D5FF; border-left: 4px solid #7C3AED; border-radius: 6px; padding: 14px; margin: 16px 0; }}
+  .practice-header {{ font-weight: 700; font-size: 13px; color: #5B21B6; margin-bottom: 8px; border-bottom: 1px solid #F3E8FF; padding-bottom: 6px; }}
+  .practice-question {{ background-color: #FAF5FF; border: 1px solid #F3E8FF; border-radius: 4px; padding: 10px; margin-bottom: 10px; font-size: 12px; line-height: 1.6; }}
+  .practice-solution {{ background-color: #FFFFFF; padding: 4px; font-size: 12px; }}
+  .practice-solution .step-label {{ font-weight: 700; color: #7C3AED; margin-top: 8px; margin-bottom: 2px; }}
+  .calc-step {{ background-color: #FAF5FF; border: 1px solid #F3E8FF; border-radius: 4px; padding: 8px; margin: 6px 0; text-align: center; }}
+  .cheat-sheet-table {{ width: 100%; border-collapse: collapse; margin: 16px 0 8px 0; font-size: 12px; }}
+  .cheat-sheet-table th {{ background-color: #0F172A; color: #FFFFFF; font-weight: 600; padding: 8px 10px; border: 1px solid #334155; text-align: center; }}
+  .cheat-sheet-table td {{ border: 1px solid #E2E8F0; padding: 8px 10px; text-align: center; background-color: #FFFFFF; }}
   .cheat-sheet-table tr:nth-child(even) td {{ background-color: #F8FAFC; }}
 </style>
 </head>
@@ -444,7 +356,15 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
-        page.wait_for_timeout(1000)
+        
+        # [수정됨] MathJax 수식 렌더링이 완료될 때까지 안전하게 대기
+        try:
+            page.wait_for_selector("#math-rendered-flag", timeout=15000)
+        except Exception as e:
+            print("    [경고] 수식 렌더링 지연. 강제로 3초 대기 후 인쇄합니다.")
+            page.wait_for_timeout(3000)
+            
+        page.wait_for_timeout(500)
         page.pdf(
             path=output_pdf_path,
             format="A4",
@@ -454,11 +374,11 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser.close()
 
 
-def update_notion_dynamic_results(page: dict, part_links: list):
+def update_notion_results(page: dict, pdf_results: list):
     page_id = page["id"]
     props = page.get("properties", {})
     
-    first_url = part_links[0]["url"] if part_links else ""
+    first_url = pdf_results[0]["url"] if pdf_results else ""
     update_data = {"내용 요약본": {"url": first_url}}
     
     photo_prop = props.get("참고 사진", {})
@@ -475,17 +395,16 @@ def update_notion_dynamic_results(page: dict, part_links: list):
 
     notion.pages.update(page_id=page_id, properties=update_data)
 
-    # 본문에 N개 파트 북마크 블록 순차 추가
     bookmark_blocks = [
         {
             "object": "block",
             "type": "heading_3",
             "heading_3": {
-                "rich_text": [{"type": "text", "text": {"content": f"📚 자동 분할 심층 해설집 (총 {len(part_links)}개 파트)"}}]
+                "rich_text": [{"type": "text", "text": {"content": f"📚 전공 심층 해설집 (총 {len(pdf_results)}개 파트 완결)"}}]
             }
         }
     ]
-    for item in part_links:
+    for item in pdf_results:
         bookmark_blocks.append({
             "object": "block",
             "type": "bookmark",
@@ -505,10 +424,10 @@ def sanitize_filename(filename: str) -> str:
 def main():
     items = get_unprocessed_items()
     if not items:
-        print("[동적 분할 해설집] 처리할 새 항목이 없습니다.")
+        print("[심층 해설집 파이프라인] 처리할 새 항목이 없습니다.")
         return
 
-    print(f"[동적 분할 해설집] 미처리 항목 {len(items)}개 발견.")
+    print(f"[심층 해설집 파이프라인] 미처리 항목 {len(items)}개 발견.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for page in items:
@@ -528,37 +447,42 @@ def main():
             if not files:
                 continue
 
-            print(f"\n[작업 시작] 과목: '{subject_hint}', 단원: '{unit_hint}' (파일 {len(files)}개)")
+            print(f"\n========================================================")
+            print(f"[작업 시작] 과목: '{subject_hint}', 단원: '{unit_hint}' (파일 {len(files)}개)")
+            print(f"========================================================")
 
             try:
                 file_payload = prepare_file_payload(files)
 
-                # 1. 분량 및 소단원 동적 분석
-                sections = plan_content_sections(file_payload, subject_hint, unit_hint)
-                total_parts = len(sections)
+                # 1. (개념 + 예제/H.W. <= 4) 기준 기반 자동 분할 계획 도출 (성공했던 로직 복구)
+                chunks = plan_balanced_chunks(file_payload, subject_hint, unit_hint)
+                total_parts = len(chunks)
 
-                part_links = []
-                # 2. 파트별 독립 생성 및 업로드 루프
-                for idx, section in enumerate(sections, 1):
-                    section["part_index"] = idx
-                    p_title, p_html = generate_section_commentary(file_payload, subject_hint, unit_hint, section, total_parts)
-                    p_full_html = build_full_html(p_title, f"Part {idx}/{total_parts}. {section.get('topic_title', '')}", p_html)
+                pdf_results = []
+                # 2. 파트별 독립 생성 및 PDF 렌더링 루프
+                for idx, chunk in enumerate(chunks, 1):
+                    chunk["part_index"] = idx
+                    print(f"\n  [Part {idx}/{total_parts}] '{chunk.get('part_title')}' 생성 시작...")
+
+                    p_title, p_html = generate_part_html(file_payload, subject_hint, unit_hint, chunk, total_parts)
+                    p_full_html = build_full_html(p_title, f"Part {idx}/{total_parts}. {chunk.get('part_title')}", p_html)
                     
                     pdf_filename = f"{sanitize_filename(p_title)}.pdf"
                     pdf_path = os.path.join(temp_dir, pdf_filename)
                     render_html_to_pdf(p_full_html, pdf_path)
 
                     pdf_url = upload_pdf_to_github_release(pdf_path, pdf_filename)
-                    print(f"  -> Part {idx}/{total_parts} 업로드 완료: {pdf_url}")
-                    part_links.append({"title": p_title, "url": pdf_url})
+                    print(f"  ✅ [Part {idx}/{total_parts}] 업로드 완료: {pdf_url}")
+                    pdf_results.append({"title": p_title, "url": pdf_url})
+
                     time.sleep(1)
 
-                # 3. 노션 등록 (컬럼 + N개 본문 북마크 블록)
-                update_notion_dynamic_results(page, part_links)
-                print(f"  -> Notion에 총 {total_parts}개 해설집 등록 완료!\n")
+                # 3. 노션 데이터베이스 및 본문 북마크 업데이트
+                update_notion_results(page, pdf_results)
+                print(f"\n  🎉 Notion 등록 완판! (총 {len(pdf_results)}개 파트 생성 완료)\n")
 
             except Exception as e:
-                print(f"  -> 최종 실패: {e}\n")
+                print(f"  ❌ 최종 처리 실패: {e}\n")
 
 
 if __name__ == "__main__":
