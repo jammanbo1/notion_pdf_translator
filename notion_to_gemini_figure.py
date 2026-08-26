@@ -1,6 +1,6 @@
+import json
 import os
 import re
-import json
 import time
 import mimetypes
 import tempfile
@@ -21,10 +21,11 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
+# 안정적인 모델 폴백 라인업
 FALLBACK_MODELS = [
-    "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
+    "gemini-3.6-flash",
     "gemini-3.7-flash",
 ]
 
@@ -43,7 +44,7 @@ def get_or_create_release(tag="pdf-reports"):
     payload = {
         "tag_name": tag,
         "name": "Generated PDF Reports",
-        "body": "자동 생성된 PDF 정리본 보관소입니다.",
+        "body": "자동 생성된 전공 PDF 심층 해설집 보관소입니다.",
         "draft": False,
         "prerelease": False,
     }
@@ -62,7 +63,7 @@ def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
         "Content-Type": "application/pdf",
     }
 
-    safe_name = f"fig_{int(time.time())}_{os.path.basename(file_path)}"
+    safe_name = f"doc_{int(time.time())}_{os.path.basename(file_path)}"
     params = {"name": safe_name}
 
     with open(file_path, "rb") as f:
@@ -99,8 +100,8 @@ def get_unprocessed_items():
     unprocessed = []
     for page in results:
         props = page.get("properties", {})
-        photo_link_prop = props.get("참고 사진", {})
-        existing_url = photo_link_prop.get("url") if photo_link_prop.get("type") == "url" else None
+        text_link_prop = props.get("내용 요약본", {})
+        existing_url = text_link_prop.get("url") if text_link_prop.get("type") == "url" else None
 
         if not existing_url:
             unprocessed.append(page)
@@ -126,158 +127,153 @@ def find_supported_attachments(page):
     return supported_files
 
 
-# ==============================================================================
-# STAGE 1: 도판 기획기 (Planner) - 핵심 도판 2개 선정 및 설계서(JSON) 추출
-# ==============================================================================
-def plan_figures_with_gemini(raw_file_payload: list, subject_hint: str, unit_hint: str) -> dict:
-    prompt_text = f"""당신은 세계 최고 수준의 이공계 전공서적 전문 편집위원장입니다.
-첨부된 강의 자료를 분석하여, 학생들에게 시각적 직관과 물리적 이해를 제공하기 위한 [가장 핵심적인 도판 딱 2개]를 엄선하여 기획서를 작성하세요.
-(과목: {subject_hint}, 단원명: {unit_hint})
-
-★ 절대 규칙:
-1. 도판 개수는 무조건 [가장 중요한 2개]만 선정하세요.
-2. SVG 코드나 HTML 태그는 일절 작성하지 마세요. (순수 기획 데이터만 생성)
-3. 출력은 반드시 아래의 JSON 포맷으로만 응답해야 합니다. (앞뒤 잡담, 마크다운 코드블록 금지)
-
-{{
-  "doc_title": "[{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집",
-  "figures": [
-    {{
-      "fig_num": "Fig 1",
-      "title": "도판 1 제목",
-      "condition": "현상 및 조건 (수식 및 물리적 조건 서술)",
-      "visual_key": "시각적 핵심 (해석 서술)",
-      "drawing_spec": "SVG 작도를 위한 구체적 설계 지침"
-    }},
-    {{
-      "fig_num": "Fig 2",
-      "title": "도판 2 제목",
-      "condition": "현상 및 조건 서술",
-      "visual_key": "시각적 핵심 서술",
-      "drawing_spec": "SVG 작도를 위한 구체적 설계 지침"
-    }}
-  ]
-}}
-"""
-    payload = [prompt_text] + raw_file_payload
-
-    for model_name in FALLBACK_MODELS:
-        try:
-            print(f"  [Stage 1: 도판 기획] -> [{model_name}] 호출 중...")
-            model = genai.GenerativeModel(
-                model_name,
-                generation_config={"temperature": 0.2, "response_mime_type": "application/json"}
+def prepare_file_payload(file_list: list) -> list:
+    payload = []
+    for item in file_list:
+        res = requests.get(item["url"], stream=True, timeout=120)
+        res.raise_for_status()
+        mime_type, _ = mimetypes.guess_type(item["name"])
+        if not mime_type:
+            mime_type = (
+                "application/pdf"
+                if item["name"].lower().endswith(".pdf")
+                else "image/jpeg"
             )
-            res = model.generate_content(payload, request_options={"timeout": 300})
-            
-            clean_json = res.text.strip()
-            match = re.search(r"(\{[\s\S]*\})", clean_json)
-            if match:
-                clean_json = match.group(1)
-            
-            # 파이썬 정규식 치환 함정 해결: lambda를 사용하여 LaTeX 백슬래시(\)를 완벽하게 이스케이프(\\)
-            fixed_json = re.sub(r'\\(?![/\\bfnrtu"U])', lambda m: r'\\', clean_json)
-            
-            data = json.loads(fixed_json, strict=False)
-            print(f"  [Stage 1: 기획 완료] 도판 {len(data.get('figures', []))}개 기획 수립 성공!")
-            return data
-        except Exception as e:
-            print(f"  [Stage 1 경고] {model_name} 실패: {e}")
-            time.sleep(2)
-            continue
-
-    raise RuntimeError("Stage 1 도판 기획 단계 실패")
+        payload.append({"mime_type": mime_type, "data": res.content})
+    return payload
 
 
-# ==============================================================================
-# STAGE 2: 도판 전문 작도기 (Artist) - 단일 도판 1:1 순수 SVG 렌더링
-# ==============================================================================
-def draw_single_svg_with_gemini(fig_info: dict, subject_hint: str) -> str:
-    prompt_text = f"""당신은 세계 최고의 물리/수학/공학 도판 전문 SVG 아티스트입니다.
-아래 주어진 [도판 기획서]를 바탕으로, 전공 교재에 수록될 최고 해상도의 [단색 흑백(Monochrome) 인라인 SVG 코드]를 작도하세요.
+def plan_balanced_chunks(file_payload: list, subject_hint: str = "", unit_hint: str = "") -> list:
+    """슬라이드 전체를 스캔하여 (개념 수 + 예제/과제 수 <= 4) 규칙으로 완벽 분할"""
+    planning_prompt = f"""당신은 이공계 전공 강의 교재 전문 기획자입니다.
+첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})의 전체 내용을 분석하여, 각 파트가 8,192 토큰 한도 내에서 100% 깊이 있게 해설될 수 있도록 **[최적 분할 계획]**을 수립하세요.
 
-[도판 정보]
-- 과목: {subject_hint}
-- 도판 번호: {fig_info.get('fig_num')}
-- 도판 제목: {fig_info.get('title')}
-- 작도 상세 지침: {fig_info.get('drawing_spec')}
+★ [엄격한 분할 용량 규칙]:
+1. 1개 파트(Part)당 용량 합계는 반드시 **[핵심 개념 2~3개 + 예제/과제(H.W.) 1~2개] (총합 최대 4개 이하)**로 제한하세요.
+2. 예시:
+   - 개념 2개 + 예제 2개 = 1개 파트 (적정)
+   - 개념 3개 + 예제 1개 = 1개 파트 (적정)
+   - 순수 문제/H.W.만 있는 구간: 문제 3~4개 = 1개 파트 (적정)
+3. 전체 슬라이드에 개념이 20개, 예제/H.W.가 8개 있다면 반드시 7~8개 파트로 균등하게 쪼개야 합니다.
+4. 반드시 아래 JSON 배열 형식으로만 출력하세요. (추가 설명 금지)
 
-★ [출력 절대 규칙]
-1. 오직 `<svg ...> ... </svg>` 태그만 출력하세요.
-2. 앞뒤 설명, HTML 태그, 마크다운 코드블록(```) 등 메타 텍스트를 1글자도 출력하지 마세요.
-
-★ [SVG 작도 스타일 규격]
-1. 뷰박스 및 레이아웃:
-   - `<svg viewBox="0 0 540 280" width="100%" height="240" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)">` 표준 적용.
-2. 모노크롬 전공서 스타일:
-   - 외곽선/주요 곡선/중요 벡터: `#0F172A` (stroke-width: 2.0 ~ 2.5)
-   - 좌표축/회로 도선/눈금: `#334155` 또는 `#475569` (stroke-width: 1.2 ~ 1.4)
-   - 보조선/투영 점선/점근선: `#64748B` 또는 `#94A3B8` (stroke-dasharray="4,4")
-   - 3D 입체 음영/면적: Linear/Radial Gradient (`#FFFFFF` -> `#F1F5F9` -> `#CBD5E1` -> `#94A3B8`)
-3. 3차원 투영 및 기하학:
-   - z축(수직 상향), x축(좌하단 사선), y축(우측 수평/우상향).
-   - 뒷면 가림선 점선 처리, 3D 단면 원은 납작한 타원(`rx:ry ≈ 3:1 ~ 4:1`) 작도.
-4. 엄밀한 라벨링:
-   - 변수/좌표축 기호는 이탤릭 세리프체 (`font-family="Times New Roman, serif" font-style="italic"`).
-   - 첨자는 `<tspan>` 활용. 화살표 머리는 `<defs><marker>`로 깔끔하게 처리.
+[응답 JSON 포맷]:
+[
+  {{
+    "part_index": 1,
+    "part_title": "자기 홀극 도입 및 확장된 맥스웰 방정식",
+    "concepts": ["자기 홀극(Magnetic Monopole) 정의", "미정계수 f 유도 및 패러데이 법칙 확장"],
+    "examples": ["점 자기 홀극의 구형 가우스면 자속 적분 증명"]
+  }},
+  {{
+    "part_index": 2,
+    "part_title": "전자기 이중성과 SO(2) 대칭 그룹 확장",
+    "concepts": ["90도 이중성 변환(Discrete)", "연속적 SO(2) 회전 변환 및 불변성 증명"],
+    "examples": ["과제(H.W.): SO(2) 변환에 대한 맥스웰 방정식 공변성 증명"]
+  }}
+]
 """
+    print("  [1단계: 단원 구조 스캔] -> 개념 및 예제/H.W. 수량 기반 안전 분할 계획 수립 중...")
     for model_name in FALLBACK_MODELS:
         try:
-            print(f"    [Stage 2: SVG 작도] -> {fig_info.get('fig_num')} ({model_name})...")
-            model = genai.GenerativeModel(model_name, generation_config={"temperature": 0.2})
-            res = model.generate_content([prompt_text], request_options={"timeout": 300})
-            
-            raw_svg = res.text.strip()
-            svg_match = re.search(r"(<svg[\s\S]*?</svg>)", raw_svg, re.IGNORECASE)
-            if svg_match:
-                print(f"    [Stage 2: 작도 성공] -> {fig_info.get('fig_num')} 완성!")
-                return svg_match.group(1).strip()
-            else:
-                raise ValueError("SVG 태그 감지 실패")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content([planning_prompt] + file_payload)
+            clean_json = re.sub(r"^```json\s*|^```\s*|\s*```$", "", response.text.strip(), flags=re.MULTILINE)
+            plan = json.loads(clean_json)
+            if isinstance(plan, list) and len(plan) > 0:
+                print(f"  [분할 계획 확정] 총 {len(plan)}개 독립 파트로 안전 분할 완료.")
+                return plan
         except Exception as e:
-            print(f"    [Stage 2 경고] {fig_info.get('fig_num')} 실패: {e}")
+            print(f"  [경고] {model_name} 계획 수립 실패 ({e}), 백업 모델 시도...")
+            time.sleep(1)
+
+    return [{"part_index": 1, "part_title": f"{unit_hint} 핵심 해설", "concepts": ["핵심 이론"], "examples": ["대표 예제"]}]
+
+
+def generate_part_html(file_payload: list, subject_hint: str, unit_hint: str, chunk_info: dict, total_parts: int) -> tuple:
+    part_idx = chunk_info.get("part_index", 1)
+    part_title = chunk_info.get("part_title", "")
+    concepts = chunk_info.get("concepts", [])
+    examples = chunk_info.get("examples", [])
+
+    prompt_text = f"""당신은 세계 최고 수준의 이공계 전공 수석 해설위원이자 공식 전공서 편집자입니다.
+첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})에서 아래 **[지정된 파트 내용]**에만 100% 토큰을 집중하여 완결된 심층 보충 해설집을 작성하세요.
+
+★ [현재 작성 대상 파트 ({part_idx}/{total_parts})]:
+- 파트 제목: {part_title}
+- 담당 핵심 개념 목록: {json.dumps(concepts, ensure_ascii=False)}
+- 담당 예제/H.W./코드 목록: {json.dumps(examples, ensure_ascii=False)}
+
+★ [작성 원칙]:
+1. 지정되지 않은 다른 소주제는 과감히 생략하고, 오직 위 목록의 개념과 예제에 모든 분량을 쏟아부으세요.
+2. 유도 과정(Step 1, 2, 3)과 문제 풀이는 중간 생략 없이 수식($\LaTeX$)과 논리를 빈틈없이 전개하세요.
+
+[1단계: 제목 생성]
+답변 첫 줄에 반드시 다음 형식으로 출력:
+DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {part_title})
+
+[2단계: 본문 HTML 작성]
+제목 아랫줄부터는 본문 HTML 코드만 작성하세요.
+
+★ [주제별 5단계 완결 마크업 절대 규칙]
+다루는 각 개념마다:
+1. [원문 공식/개념] (파란색 박스 - 기준점)
+   <div class="note-box note-blue"><span class="badge badge-blue">원문 공식/개념</span> $$수식$$ <p>(슬라이드 원문 정의 및 의미 요약)</p></div>
+
+2. [도입 배경 & 핵심 직관] (초록색 박스 - Why)
+   <div class="note-box note-green"><span class="badge badge-green">도입 배경 & 핵심 직관</span> <p>(기존 한계 및 등장 배경, 물리적/공학적 직관 2~3줄)</p></div>
+
+3. [생략된 행간 유도 & 증명] (빨간색 박스 - How)
+   <div class="note-box note-red"><span class="badge badge-red">생략된 행간 복원</span> (Step 1, 2, 3 단계별 수식 전개 및 논리 징검다리 해설)</div>
+
+4. [시험 함정 & 필기 팁] (주황색 박스 - Pitfall)
+   <div class="comment-box"><span class="badge badge-orange">시험 함정 & 필기 팁</span> (오개념 주의, N=0 등 경계 조건, 손글씨 필기 복원)</div>
+
+다루는 각 예제/과제(H.W.)/코드마다:
+5. [실전 예제 / H.W. / 코드 트레이싱] (보라색 박스 - Practice)
+   <div class="practice-box">
+     <div class="practice-header"><span class="badge badge-purple">실전 분석</span> (예제/과제 제목)</div>
+     <div class="practice-question"><strong>[문제 상황 / 코드 / 과제 원문]</strong> (상황 서술 또는 코드)</div>
+     <div class="practice-solution">
+       <div class="step-label">Step 1. 물리적 조건 / 초기 메모리 레이아웃 분석</div>
+       <p>(경계 조건, 좌표계 설정, 포인터 상태)</p>
+       <div class="step-label">Step 2. 단계별 실행 흐름 트레이싱 및 수식 유도</div>
+       <div class="calc-step">$$ ... $$</div>
+       <div class="step-label">Step 3. 결과 해석 및 감점 방지 팁</div>
+       <p>(시간 복잡도, 부호 주의점, 물리적 의미)</p>
+     </div>
+   </div>
+
+★ [최하단 치트시트]: <table class="cheat-sheet-table">로 현재 파트의 핵심 공식 비교 요약.
+"""
+
+    for model_name in FALLBACK_MODELS:
+        print(f"    -> [{model_name}] Part {part_idx}/{total_parts} 호출 중...")
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content([prompt_text] + file_payload, request_options={"timeout": 600})
+            
+            raw_text = response.text
+            extracted_title = f"Part_{part_idx}_{part_title}"
+            body_html = raw_text
+
+            match = re.search(r"DOC_TITLE:\s*(.+)", raw_text)
+            if match:
+                extracted_title = match.group(1).strip()
+                body_html = re.sub(r"DOC_TITLE:\s*.+\n?", "", raw_text).strip()
+
+            return extracted_title, body_html
+
+        except Exception as e:
+            print(f"    [경고] {model_name} 실패 ({e}), 백업 모델로 전환...")
             time.sleep(2)
             continue
 
-    raise RuntimeError(f"도판 작도 실패: {fig_info.get('fig_num')}")
+    raise RuntimeError(f"Part {part_idx} 생성 최종 실패")
 
 
-# ==============================================================================
-# STAGE 3: 파이썬 로컬 템플릿 조립기 (Assembly)
-# ==============================================================================
-def sanitize_latex_html(text: str) -> str:
-    """KaTeX 수식 내 부등호 충돌 방지"""
-    return str(text).replace("<", "&lt;").replace(">", "&gt;")
-
-
-def assemble_full_html(plan_data: dict, rendered_svgs: list) -> str:
-    title = plan_data.get("doc_title", "핵심 시각 자료 및 도판 해설집")
-    figures_data = plan_data.get("figures", [])
-
-    cards_html = []
-    for fig_info, svg_code in zip(figures_data, rendered_svgs):
-        fig_num = fig_info.get("fig_num", "Fig")
-        fig_title = fig_info.get("title", "")
-        cond = sanitize_latex_html(fig_info.get("condition", ""))
-        vkey = sanitize_latex_html(fig_info.get("visual_key", ""))
-
-        card_template = f"""
-  <div class="figure-card">
-    <div class="figure-header">
-      <span class="badge">{fig_num}</span> <strong>{fig_title}</strong>
-    </div>
-    <div class="svg-container">
-      {svg_code}
-    </div>
-    <div class="figure-desc">
-      <p><strong>현상 및 조건:</strong> {cond}</p>
-      <p><strong>시각적 핵심:</strong> {vkey}</p>
-    </div>
-  </div>
-"""
-        cards_html.append(card_template)
-
-    body_content = "\n".join(cards_html)
+def build_full_html(title: str, subtitle: str, content_html: str) -> str:
+    clean_html = re.sub(r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE)
 
     return f"""<!DOCTYPE html>
 <html lang="ko">
@@ -312,30 +308,24 @@ def assemble_full_html(plan_data: dict, rendered_svgs: list) -> str:
     margin-bottom: 22px; 
   }}
   .doc-title {{ 
-    font-size: 20px; 
+    font-size: 19px; 
     font-weight: 800; 
     color: #0F172A; 
     margin: 0 0 6px 0; 
     letter-spacing: -0.5px;
   }}
   .doc-subtitle {{ font-size: 12px; color: #64748B; margin: 0; font-weight: 500; }}
+  
+  h2 {{ 
+    font-size: 15px; 
+    font-weight: 700; 
+    color: #0F172A; 
+    border-left: 3.5px solid #2563EB; 
+    padding-left: 9px; 
+    margin-top: 24px; 
+    margin-bottom: 12px; 
+  }}
 
-  .figure-card {{
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 8px;
-    padding: 16px;
-    margin: 22px 0;
-    page-break-inside: avoid;
-  }}
-  .figure-header {{
-    font-size: 13.5px;
-    font-weight: 700;
-    color: #0F172A;
-    margin-bottom: 12px;
-    border-bottom: 1px solid #F1F5F9;
-    padding-bottom: 8px;
-  }}
   .badge {{
     display: inline-block;
     font-size: 11px;
@@ -343,38 +333,119 @@ def assemble_full_html(plan_data: dict, rendered_svgs: list) -> str:
     padding: 2px 7px;
     border-radius: 4px;
     margin-right: 6px;
-    background: #F1F5F9;
-    color: #0F172A;
-    border: 1px solid #CBD5E1;
     letter-spacing: -0.2px;
+    vertical-align: middle;
   }}
-  .svg-container {{
-    text-align: center;
-    background: #FFFFFF;
-    border: 1px solid #F8FAFC;
-    border-radius: 6px;
-    padding: 12px;
+  .badge-red {{ background-color: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }}
+  .badge-blue {{ background-color: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }}
+  .badge-green {{ background-color: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }}
+  .badge-purple {{ background-color: #FAF5FF; color: #7C3AED; border: 1px solid #E9D5FF; }}
+  .badge-orange {{ background-color: #FFF7ED; color: #EA580C; border: 1px solid #FFEDD5; }}
+
+  .note-box, .comment-box, .practice-box {{
+    break-inside: avoid;
+    page-break-inside: avoid;
   }}
-  .figure-desc {{
-    background: #F8FAFC;
+
+  .note-box {{
+    background-color: #FFFFFF;
     border: 1px solid #E2E8F0;
     border-radius: 6px;
-    padding: 10px 12px;
-    margin-top: 12px;
-    font-size: 12px;
+    padding: 12px 14px;
+    margin: 12px 0;
+    font-size: 12.5px;
     line-height: 1.65;
   }}
-  .figure-desc p {{
-    margin: 3px 0;
+  .note-red {{ border-left: 4px solid #DC2626; background-color: #FEF2F20D; }}
+  .note-blue {{ border-left: 4px solid #2563EB; background-color: #EFF6FF0D; }}
+  .note-green {{ border-left: 4px solid #16A34A; background-color: #F0FDF40D; }}
+
+  .comment-box {{
+    background-color: #FFF7ED;
+    border: 1px solid #FFEDD5;
+    border-left: 4px solid #EA580C;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #9A3412;
   }}
+
+  .practice-box {{ 
+    background-color: #FFFFFF; 
+    border: 1px solid #E9D5FF; 
+    border-left: 4px solid #7C3AED; 
+    border-radius: 6px; 
+    padding: 14px; 
+    margin: 16px 0; 
+  }}
+  .practice-header {{ 
+    font-weight: 700; 
+    font-size: 13px; 
+    color: #5B21B6; 
+    margin-bottom: 8px; 
+    border-bottom: 1px solid #F3E8FF; 
+    padding-bottom: 6px; 
+  }}
+  .practice-question {{ 
+    background-color: #FAF5FF; 
+    border: 1px solid #F3E8FF; 
+    border-radius: 4px; 
+    padding: 10px; 
+    margin-bottom: 10px; 
+    font-size: 12px; 
+    line-height: 1.6; 
+  }}
+  .practice-solution {{ 
+    background-color: #FFFFFF; 
+    padding: 4px; 
+    font-size: 12px; 
+  }}
+  .practice-solution .step-label {{ 
+    font-weight: 700; 
+    color: #7C3AED; 
+    margin-top: 8px; 
+    margin-bottom: 2px; 
+  }}
+  .calc-step {{ 
+    background-color: #FAF5FF; 
+    border: 1px solid #F3E8FF; 
+    border-radius: 4px; 
+    padding: 8px; 
+    margin: 6px 0; 
+    text-align: center; 
+  }}
+
+  .cheat-sheet-table {{ 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 16px 0 8px 0; 
+    font-size: 12px; 
+  }}
+  .cheat-sheet-table th {{ 
+    background-color: #0F172A; 
+    color: #FFFFFF; 
+    font-weight: 600; 
+    padding: 8px 10px; 
+    border: 1px solid #334155; 
+    text-align: center; 
+  }}
+  .cheat-sheet-table td {{ 
+    border: 1px solid #E2E8F0; 
+    padding: 8px 10px; 
+    text-align: center; 
+    background-color: #FFFFFF; 
+  }}
+  .cheat-sheet-table tr:nth-child(even) td {{ background-color: #F8FAFC; }}
 </style>
 </head>
 <body>
   <div class="header-container">
     <h1 class="doc-title">{title}</h1>
-    <p class="doc-subtitle">핵심 시각 자료 및 도판 해설집</p>
+    <p class="doc-subtitle">{subtitle}</p>
   </div>
-  {body_content}
+  {clean_html}
 </body>
 </html>
 """
@@ -385,10 +456,7 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
-        
-        page.evaluate("document.fonts.ready")
-        page.wait_for_timeout(1500)
-        
+        page.wait_for_timeout(1000)
         page.pdf(
             path=output_pdf_path,
             format="A4",
@@ -398,16 +466,17 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         browser.close()
 
 
-def update_notion_figure_success(page: dict, download_url: str):
+def update_notion_results(page: dict, pdf_results: list):
     page_id = page["id"]
     props = page.get("properties", {})
     
-    update_data = {"참고 사진": {"url": download_url}}
+    first_url = pdf_results[0]["url"] if pdf_results else ""
+    update_data = {"내용 요약본": {"url": first_url}}
     
-    text_prop = props.get("내용 요약본", {})
-    text_url = text_prop.get("url") if text_prop.get("type") == "url" else None
+    photo_prop = props.get("참고 사진", {})
+    photo_url = photo_prop.get("url") if photo_prop.get("type") == "url" else None
     
-    if text_url:
+    if photo_url:
         try:
             update_data["상태"] = {"status": {"name": "완료"}}
         except Exception:
@@ -416,10 +485,29 @@ def update_notion_figure_success(page: dict, download_url: str):
             except Exception:
                 pass
 
+    notion.pages.update(page_id=page_id, properties=update_data)
+
+    # 1개든 여러 개든 본문에 명확하게 북마크 블록으로 등록
+    bookmark_blocks = [
+        {
+            "object": "block",
+            "type": "heading_3",
+            "heading_3": {
+                "rich_text": [{"type": "text", "text": {"content": f"📚 전공 심층 해설집 (총 {len(pdf_results)}개 완결)"}}]
+            }
+        }
+    ]
+    for item in pdf_results:
+        bookmark_blocks.append({
+            "object": "block",
+            "type": "bookmark",
+            "bookmark": {"url": item["url"]}
+        })
+
     try:
-        notion.pages.update(page_id=page_id, properties=update_data)
+        notion.blocks.children.append(block_id=page_id, children=bookmark_blocks)
     except Exception as e:
-        print(f"  [오류] Notion 업데이트 실패: {e}")
+        print(f"  [알림] 노션 본문 블록 추가 건너뜀: {e}")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -429,10 +517,10 @@ def sanitize_filename(filename: str) -> str:
 def main():
     items = get_unprocessed_items()
     if not items:
-        print("[도판 생성] 처리할 새 항목이 없습니다.")
+        print("[심층 해설집 파이프라인] 처리할 새 항목이 없습니다.")
         return
 
-    print(f"[도판 생성] 미처리 항목 {len(items)}개 발견.")
+    print(f"[심층 해설집 파이프라인] 미처리 항목 {len(items)}개 발견.")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         for page in items:
@@ -452,54 +540,42 @@ def main():
             if not files:
                 continue
 
-            print(f"\n[작업 시작] 과목: '{subject_hint}', 단원: '{unit_hint}' (파일 {len(files)}개)...")
-
-            raw_file_payload = []
-            for item in files:
-                try:
-                    res = requests.get(item["url"], stream=True, timeout=120)
-                    res.raise_for_status()
-                    mime_type, _ = mimetypes.guess_type(item["name"])
-                    if not mime_type:
-                        mime_type = "application/pdf" if item["name"].lower().endswith(".pdf") else "image/jpeg"
-                    raw_file_payload.append({"mime_type": mime_type, "data": res.content})
-                except Exception as e:
-                    print(f"  [다운로드 오류] {item['name']}: {e}")
-
-            if not raw_file_payload:
-                continue
+            print(f"\n========================================================")
+            print(f"[작업 시작] 과목: '{subject_hint}', 단원: '{unit_hint}' (파일 {len(files)}개)")
+            print(f"========================================================")
 
             try:
-                # 1단계: 도판 2개 기획 (람다 기반 이스케이프 보정)
-                plan_data = plan_figures_with_gemini(raw_file_payload, subject_hint, unit_hint)
-                
-                # 2단계: 순차 독립 SVG 작도
-                rendered_svgs = []
-                for fig_info in plan_data.get("figures", []):
-                    svg_code = draw_single_svg_with_gemini(fig_info, subject_hint)
-                    rendered_svgs.append(svg_code)
+                file_payload = prepare_file_payload(files)
+
+                # 1. (개념 + 예제/H.W. <= 4) 기준 기반 자동 분할 계획 도출
+                chunks = plan_balanced_chunks(file_payload, subject_hint, unit_hint)
+                total_parts = len(chunks)
+
+                pdf_results = []
+                # 2. 파트별 독립 생성 및 PDF 렌더링 루프
+                for idx, chunk in enumerate(chunks, 1):
+                    chunk["part_index"] = idx
+                    print(f"\n  [Part {idx}/{total_parts}] '{chunk.get('part_title')}' 생성 시작...")
+
+                    p_title, p_html = generate_part_html(file_payload, subject_hint, unit_hint, chunk, total_parts)
+                    p_full_html = build_full_html(p_title, f"Part {idx}/{total_parts}. {chunk.get('part_title')}", p_html)
+                    
+                    pdf_filename = f"{sanitize_filename(p_title)}.pdf"
+                    pdf_path = os.path.join(temp_dir, pdf_filename)
+                    render_html_to_pdf(p_full_html, pdf_path)
+
+                    pdf_url = upload_pdf_to_github_release(pdf_path, pdf_filename)
+                    print(f"  ✅ [Part {idx}/{total_parts}] 업로드 완료: {pdf_url}")
+                    pdf_results.append({"title": p_title, "url": pdf_url})
+
                     time.sleep(1)
 
-                # 3단계: 로컬 템플릿 조립 & PDF 컴파일
-                doc_title = plan_data.get("doc_title", f"[{subject_hint} - {unit_hint}] 핵심 시각 자료 및 도판 해설집")
-                safe_title = sanitize_filename(doc_title)
-                full_html = assemble_full_html(plan_data, rendered_svgs)
-
-                temp_pdf_path = os.path.join(temp_dir, f"{safe_title}.pdf")
-                render_html_to_pdf(full_html, temp_pdf_path)
-
-                # 4단계: GitHub Releases 배포 & 노션 링크 갱신
-                print("  -> GitHub Releases 저장소 업로드 중...")
-                pdf_url = upload_pdf_to_github_release(temp_pdf_path, f"{safe_title}.pdf")
-                print(f"  -> 다운로드 링크: {pdf_url}")
-
-                update_notion_figure_success(page, pdf_url)
-                print("  -> Notion '참고 사진' 컬럼 업데이트 완료!\n")
-
-                time.sleep(2)
+                # 3. 노션 데이터베이스 및 본문 북마크 업데이트
+                update_notion_results(page, pdf_results)
+                print(f"\n  🎉 Notion 등록 완판! (총 {len(pdf_results)}개 파트 생성 완료)\n")
 
             except Exception as e:
-                print(f"  -> 최종 처리 실패: {e}\n")
+                print(f"  ❌ 최종 처리 실패: {e}\n")
 
 
 if __name__ == "__main__":
