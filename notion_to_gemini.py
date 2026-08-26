@@ -21,14 +21,12 @@ GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 notion = Client(auth=NOTION_TOKEN)
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 안정적인 최신 모델 폴백 라인업
 FALLBACK_MODELS = [
     "gemini-3.6-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
     "gemini-3.7-flash",
 ]
-
 
 def get_or_create_release(tag="pdf-reports"):
     headers = {
@@ -52,7 +50,6 @@ def get_or_create_release(tag="pdf-reports"):
     create_res.raise_for_status()
     return create_res.json()
 
-
 def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
     release = get_or_create_release()
     upload_url_template = release["upload_url"]
@@ -72,14 +69,12 @@ def upload_pdf_to_github_release(file_path: str, file_name: str) -> str:
         asset_data = res.json()
         return asset_data["browser_download_url"]
 
-
 def get_data_source_id():
     database = notion.databases.retrieve(database_id=NOTION_DB_ID)
     data_sources = database.get("data_sources", [])
     if not data_sources:
         raise RuntimeError("이 데이터베이스에서 data_source를 찾을 수 없습니다.")
     return data_sources[0]["id"]
-
 
 def get_unprocessed_items():
     data_source_id = get_data_source_id()
@@ -108,7 +103,6 @@ def get_unprocessed_items():
 
     return unprocessed
 
-
 def find_supported_attachments(page):
     supported_files = []
     properties = page.get("properties", {})
@@ -126,7 +120,6 @@ def find_supported_attachments(page):
 
     return supported_files
 
-
 def prepare_file_payload(file_list: list) -> list:
     payload = []
     for item in file_list:
@@ -142,7 +135,6 @@ def prepare_file_payload(file_list: list) -> list:
         payload.append({"mime_type": mime_type, "data": res.content})
     return payload
 
-
 def plan_balanced_chunks(file_payload: list, subject_hint: str = "", unit_hint: str = "") -> list:
     planning_prompt = f"""당신은 이공계 전공 강의 교재 전문 기획자입니다.
 첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})의 전체 내용을 분석하여, 각 파트가 8,192 토큰 한도 내에서 100% 깊이 있게 해설될 수 있도록 **[최적 분할 계획]**을 수립하세요.
@@ -155,16 +147,6 @@ def plan_balanced_chunks(file_payload: list, subject_hint: str = "", unit_hint: 
    - 순수 문제/H.W.만 있는 구간: 문제 3~4개 = 1개 파트 (적정)
 3. 전체 슬라이드에 개념이 많다면 규칙에 맞춰 여러 파트로 균등하게 쪼개야 합니다.
 4. 반드시 아래 JSON 배열 형식으로만 출력하세요. (추가 설명 금지)
-
-[응답 JSON 포맷]:
-[
-  {{
-    "part_index": 1,
-    "part_title": "자기 홀극 도입 및 확장된 맥스웰 방정식",
-    "concepts": ["자기 홀극(Magnetic Monopole) 정의", "미정계수 f 유도 및 패러데이 법칙 확장"],
-    "examples": ["점 자기 홀극의 구형 가우스면 자속 적분 증명"]
-  }}
-]
 """
     print("  [1단계: 단원 구조 스캔] -> 개념 및 예제/H.W. 수량 기반 안전 분할 계획 수립 중...")
     for model_name in FALLBACK_MODELS:
@@ -181,7 +163,6 @@ def plan_balanced_chunks(file_payload: list, subject_hint: str = "", unit_hint: 
             time.sleep(1)
 
     return [{"part_index": 1, "part_title": f"{unit_hint} 핵심 해설", "concepts": ["핵심 이론"], "examples": ["대표 예제"]}]
-
 
 def generate_part_html(file_payload: list, subject_hint: str, unit_hint: str, chunk_info: dict, total_parts: int) -> tuple:
     part_idx = chunk_info.get("part_index", 1)
@@ -200,7 +181,7 @@ def generate_part_html(file_payload: list, subject_hint: str, unit_hint: str, ch
 ★ [작성 원칙]:
 1. 지정되지 않은 다른 소주제는 과감히 생략하고, 오직 위 목록의 개념과 예제에 모든 분량을 쏟아부으세요.
 2. 유도 과정(Step 1, 2, 3)과 문제 풀이는 중간 생략 없이 수식($\LaTeX$)과 논리를 빈틈없이 전개하세요.
-3. 수식 기호를 쓸 때 달러($) 기호 앞에 역슬래시(\\)를 붙이지 마세요.
+3. 수식 기호를 쓸 때 달러($) 기호 앞에 절대로 역슬래시(\\)를 붙이지 마세요. 순수하게 $$ 공식 $$ 형태로만 작성하세요.
 
 [1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
@@ -252,13 +233,12 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {part_title})
 
     raise RuntimeError(f"Part {part_idx} 생성 최종 실패")
 
-
 def build_full_html(title: str, subtitle: str, content_html: str) -> str:
-    # [핵심 버그 픽스] AI가 마크다운 렌더링 방지를 위해 붙인 역슬래시(\$)를 정상 수식 기호($)로 벗겨냅니다.
-    clean_html = content_html.replace('\\$', '$')
+    # 1. AI가 오류로 붙인 하나 이상의 역슬래시(\$)를 모두 순수한 $ 기호로 강제 복구 (정규표현식 적용)
+    clean_html = re.sub(r'\\+\$', '$', content_html)
     clean_html = re.sub(r"^```html\s*|\s*```$", "", clean_html.strip(), flags=re.MULTILINE)
 
-    # MathJax v3 및 렌더링 완료 대기 플래그(#math-rendered-flag) 완벽 적용
+    # 2. MathJax가 수식 오류를 무시하고 렌더링을 끝마치도록 'noerrors' 패키지 추가 및 오류 캐치 로직 적용
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -266,7 +246,9 @@ def build_full_html(title: str, subtitle: str, content_html: str) -> str:
 <title>{title}</title>
 <script>
   window.MathJax = {{
+    loader: {{load: ['[tex]/noerrors']}},
     tex: {{
+      packages: {{'[+]': ['noerrors']}},
       inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
       displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
       processEscapes: true
@@ -274,7 +256,11 @@ def build_full_html(title: str, subtitle: str, content_html: str) -> str:
     startup: {{
       pageReady: () => {{
         return MathJax.startup.defaultPageReady().then(() => {{
-          // 수식 렌더링이 모두 끝나면 이 div를 만들어 Playwright에 신호를 줍니다.
+          const flag = document.createElement('div');
+          flag.id = 'math-rendered-flag';
+          document.body.appendChild(flag);
+        }}).catch((err) => {{
+          console.log("MathJax 에러 무시:", err);
           const flag = document.createElement('div');
           flag.id = 'math-rendered-flag';
           document.body.appendChild(flag);
@@ -333,18 +319,17 @@ def build_full_html(title: str, subtitle: str, content_html: str) -> str:
 </html>
 """
 
-
 def render_html_to_pdf(html_content: str, output_pdf_path: str):
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
         
-        # MathJax 수식 렌더링이 완료될 때까지 안전하게 대기
         try:
+            # 수식 렌더링이 완료될 때까지 안전하게 대기
             page.wait_for_selector("#math-rendered-flag", timeout=15000)
         except Exception as e:
-            print("    [경고] 수식 렌더링 지연. 강제로 3초 대기 후 인쇄합니다.")
+            print("    [경고] 수식 렌더링 타임아웃. 강제로 3초 추가 대기 후 인쇄합니다.")
             page.wait_for_timeout(3000)
             
         page.wait_for_timeout(500)
@@ -355,7 +340,6 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
             margin={"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"},
         )
         browser.close()
-
 
 def update_notion_results(page: dict, pdf_results: list):
     page_id = page["id"]
@@ -399,10 +383,8 @@ def update_notion_results(page: dict, pdf_results: list):
     except Exception as e:
         print(f"  [알림] 노션 본문 블록 추가 건너뜀: {e}")
 
-
 def sanitize_filename(filename: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', "", filename).strip().replace(" ", "_")
-
 
 def main():
     items = get_unprocessed_items()
@@ -466,7 +448,6 @@ def main():
 
             except Exception as e:
                 print(f"  ❌ 최종 처리 실패: {e}\n")
-
 
 if __name__ == "__main__":
     main()
