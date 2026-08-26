@@ -144,7 +144,6 @@ def prepare_file_payload(file_list: list) -> list:
 
 
 def plan_balanced_chunks(file_payload: list, subject_hint: str = "", unit_hint: str = "") -> list:
-    """슬라이드 전체를 스캔하여 (개념 수 + 예제/과제 수 <= 4) 규칙으로 내용 기반 똑똑한 분할"""
     planning_prompt = f"""당신은 이공계 전공 강의 교재 전문 기획자입니다.
 첨부된 강의 자료(과목: {subject_hint}, 단원명: {unit_hint})의 전체 내용을 분석하여, 각 파트가 8,192 토큰 한도 내에서 100% 깊이 있게 해설될 수 있도록 **[최적 분할 계획]**을 수립하세요.
 
@@ -164,12 +163,6 @@ def plan_balanced_chunks(file_payload: list, subject_hint: str = "", unit_hint: 
     "part_title": "자기 홀극 도입 및 확장된 맥스웰 방정식",
     "concepts": ["자기 홀극(Magnetic Monopole) 정의", "미정계수 f 유도 및 패러데이 법칙 확장"],
     "examples": ["점 자기 홀극의 구형 가우스면 자속 적분 증명"]
-  }},
-  {{
-    "part_index": 2,
-    "part_title": "전자기 이중성과 SO(2) 대칭 그룹 확장",
-    "concepts": ["90도 이중성 변환(Discrete)", "연속적 SO(2) 회전 변환 및 불변성 증명"],
-    "examples": ["과제(H.W.): SO(2) 변환에 대한 맥스웰 방정식 공변성 증명"]
   }}
 ]
 """
@@ -207,6 +200,7 @@ def generate_part_html(file_payload: list, subject_hint: str, unit_hint: str, ch
 ★ [작성 원칙]:
 1. 지정되지 않은 다른 소주제는 과감히 생략하고, 오직 위 목록의 개념과 예제에 모든 분량을 쏟아부으세요.
 2. 유도 과정(Step 1, 2, 3)과 문제 풀이는 중간 생략 없이 수식($\LaTeX$)과 논리를 빈틈없이 전개하세요.
+3. 수식 기호를 쓸 때 달러($) 기호 앞에 역슬래시(\\)를 붙이지 마세요.
 
 [1단계: 제목 생성]
 답변 첫 줄에 반드시 다음 형식으로 출력:
@@ -217,34 +211,21 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {part_title})
 
 ★ [주제별 5단계 완결 마크업 절대 규칙]
 다루는 각 개념마다:
-1. [원문 공식/개념] (파란색 박스 - 기준점)
-   <div class="note-box note-blue"><span class="badge badge-blue">원문 공식/개념</span> $$수식$$ <p>(슬라이드 원문 정의 및 의미 요약)</p></div>
-
-2. [도입 배경 & 핵심 직관] (초록색 박스 - Why)
-   <div class="note-box note-green"><span class="badge badge-green">도입 배경 & 핵심 직관</span> <p>(기존 한계 및 등장 배경, 물리적/공학적 직관 2~3줄)</p></div>
-
-3. [생략된 행간 유도 & 증명] (빨간색 박스 - How)
-   <div class="note-box note-red"><span class="badge badge-red">생략된 행간 복원</span> (Step 1, 2, 3 단계별 수식 전개 및 논리 징검다리 해설)</div>
-
-4. [시험 함정 & 필기 팁] (주황색 박스 - Pitfall)
-   <div class="comment-box"><span class="badge badge-orange">시험 함정 & 필기 팁</span> (오개념 주의, N=0 등 경계 조건, 손글씨 필기 복원)</div>
-
-다루는 각 예제/과제(H.W.)/코드마다:
-5. [실전 예제 / H.W. / 코드 트레이싱] (보라색 박스 - Practice)
-   <div class="practice-box">
-     <div class="practice-header"><span class="badge badge-purple">실전 분석</span> (예제/과제 제목)</div>
-     <div class="practice-question"><strong>[문제 상황 / 코드 / 과제 원문]</strong> (상황 서술 또는 코드)</div>
+1. [원문 공식/개념]: <div class="note-box note-blue"><span class="badge badge-blue">원문 공식/개념</span> $$수식$$ <p>요약</p></div>
+2. [도입 배경 & 핵심 직관]: <div class="note-box note-green"><span class="badge badge-green">도입 배경 & 핵심 직관</span> <p>물리적/공학적 직관</p></div>
+3. [생략된 행간 유도 & 증명]: <div class="note-box note-red"><span class="badge badge-red">생략된 행간 복원</span> (Step별 수식 전개)</div>
+4. [시험 함정 & 필기 팁]: <div class="comment-box"><span class="badge badge-orange">시험 함정 & 필기 팁</span> (오개념 주의)</div>
+5. [실전 예제 / 코드 트레이싱]: <div class="practice-box">
+     <div class="practice-header"><span class="badge badge-purple">실전 분석</span> 문제 제목</div>
+     <div class="practice-question"><strong>[문제 상황]</strong></div>
      <div class="practice-solution">
-       <div class="step-label">Step 1. 물리적 조건 / 초기 메모리 레이아웃 분석</div>
-       <p>(경계 조건, 좌표계 설정, 포인터 상태)</p>
-       <div class="step-label">Step 2. 단계별 실행 흐름 트레이싱 및 수식 유도</div>
-       <div class="calc-step">$$ ... $$</div>
-       <div class="step-label">Step 3. 결과 해석 및 감점 방지 팁</div>
-       <p>(시간 복잡도, 부호 주의점, 물리적 의미)</p>
+       <div class="step-label">Step 1. 물리적 조건 분석</div>
+       <div class="step-label">Step 2. 트레이싱 및 계산</div><div class="calc-step">$$ ... $$</div>
+       <div class="step-label">Step 3. 결과 해석</div>
      </div>
    </div>
 
-★ [최하단 치트시트]: <table class="cheat-sheet-table">로 현재 파트의 핵심 공식 비교 요약.
+★ [최하단 치트시트]: <table class="cheat-sheet-table">로 현재 파트의 핵심 공식 요약.
 """
 
     for model_name in FALLBACK_MODELS:
@@ -273,9 +254,11 @@ DOC_TITLE: [{subject_hint} - {unit_hint}] (Part {part_idx}. {part_title})
 
 
 def build_full_html(title: str, subtitle: str, content_html: str) -> str:
-    clean_html = re.sub(r"^```html\s*|\s*```$", "", content_html.strip(), flags=re.MULTILINE)
+    # [핵심 버그 픽스] AI가 마크다운 렌더링 방지를 위해 붙인 역슬래시(\$)를 정상 수식 기호($)로 벗겨냅니다.
+    clean_html = content_html.replace('\\$', '$')
+    clean_html = re.sub(r"^```html\s*|\s*```$", "", clean_html.strip(), flags=re.MULTILINE)
 
-    # [수정됨] MathJax v3 및 렌더링 완료 대기 플래그(#math-rendered-flag) 완벽 적용
+    # MathJax v3 및 렌더링 완료 대기 플래그(#math-rendered-flag) 완벽 적용
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -357,7 +340,7 @@ def render_html_to_pdf(html_content: str, output_pdf_path: str):
         page = browser.new_page()
         page.set_content(html_content, wait_until="networkidle")
         
-        # [수정됨] MathJax 수식 렌더링이 완료될 때까지 안전하게 대기
+        # MathJax 수식 렌더링이 완료될 때까지 안전하게 대기
         try:
             page.wait_for_selector("#math-rendered-flag", timeout=15000)
         except Exception as e:
@@ -454,7 +437,7 @@ def main():
             try:
                 file_payload = prepare_file_payload(files)
 
-                # 1. (개념 + 예제/H.W. <= 4) 기준 기반 자동 분할 계획 도출 (성공했던 로직 복구)
+                # 1. 내용 기반 똑똑한 분할 로직 실행
                 chunks = plan_balanced_chunks(file_payload, subject_hint, unit_hint)
                 total_parts = len(chunks)
 
